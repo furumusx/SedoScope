@@ -56,6 +56,7 @@ button.dz{background:var(--ng);color:#fff;border-color:var(--ng)}
    保存キー sedoscope_v1 と既存データはそのまま使う。既存の項目は削除・変更しない。
    v3で増える項目: 商品 … genre(ジャンル) ship(送料) pr/pa(ラクマ/ヤフオク想定売価) lc/lp/ldate(出品先/出品価格/出品日)
                   設定 … trate(目標利益率) rr/ra(ラクマ/ヤフオク手数料率) ship(送料初期値) */
+const APP_VER='2026-10-23 夜';
 const KEY='sedoscope_v1';
 const ST={cand:'仕入候補',bought:'仕入済み',listed:'出品中',sold:'売却済み'};
 const CH={m:'メルカリ',y:'Yahoo!フリマ',r:'楽天ラクマ',a:'ヤフオク'},CK=Object.keys(CH);
@@ -606,7 +607,8 @@ function vSet(){
  +`<details class="card"><summary>🧮 仕入値の電卓</summary><div id="calbox-set">${calHtml('set')}</div></details>`
  +`<h2>データの保存とバックアップ</h2><div class="card"><p class="mu">データはこのiPhoneのSafari内にだけ保存され、外部には送信されません。Safariのデータ削除などで消えることがあるため、定期的にバックアップしてください。</p><details><summary>機種変更のとき</summary><ol class="mu" style="padding-left:18px;margin:0 0 8px"><li>古いiPhoneで「バックアップ(復元用)を保存」を押し、保存先に「iCloud Drive」を選ぶ</li><li>新しいiPhoneで同じアドレスのSedoScopeを開き、ホーム画面に追加</li><li>「バックアップから復元」で、iCloud Driveに保存したファイルを選ぶ</li></ol><p class="mu">ホーム画面のアプリのデータは、iPhoneの引き継ぎで自動では移らないことがあります。必ずバックアップを使ってください。</p></details>`
  +`<div class="row"><button class="p" data-a="bak">バックアップ(復元用)を保存</button></div><div class="row"><button data-a="csv">商品CSV</button><button data-a="qcsv">相場CSV</button></div>`
- +`<label>バックアップから復元(.json)</label><input id="rf" type="file" accept=".json,application/json"><div class="row dz"><button class="d" data-a="wipe">全データを削除</button></div></div>`}
+ +`<label>バックアップから復元(.json)</label><input id="rf" type="file" accept=".json,application/json"><div class="row dz"><button class="d" data-a="wipe">全データを削除</button></div></div>`
+ +`<p class="mu" style="text-align:center;margin-top:16px">SedoScope バージョン ${APP_VER}</p>`}
 function saveSet(){
  const s=Object.assign({},db.set);
  for(const k of ['trate',...CK.map(c=>'r'+c),'ship','pack','other','stale']){const v=document.querySelector('[name='+k+']').value.trim();
