@@ -116,7 +116,7 @@ tr.best{color:var(--ss)}
 .list .it{display:flex;gap:var(--sp3);align-items:center;padding:var(--sp3);border-radius:var(--r-lg);background:var(--card);border:1px solid var(--line);margin-bottom:var(--sp2)}
 .list .it img,.list .it .ph{width:40px;height:56px;border-radius:var(--sp1);object-fit:cover;background:var(--card2);flex:none}
 .list .it .m{flex:1;min-width:0}
-.list .it .t{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.list .it .t{font-weight:600;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .list .it .s{font-size:var(--fs-sub);color:var(--mut)}
 .list .it .r{text-align:right;flex:none}
 .st{font-size:11px;border-radius:var(--r-sm);padding:var(--sp1) var(--sp2);border:1px solid var(--line);margin-right:var(--sp1)}
@@ -135,8 +135,8 @@ tr.best{color:var(--ss)}
 .fld label{display:block;font-size:var(--fs-sub);color:var(--mut);margin-bottom:var(--sp1)}
 .fld input,.fld select,.fld textarea{width:100%;background:var(--card2);border:1px solid var(--line);border-radius:var(--r-md);height:var(--h-input);padding:0 var(--sp2);font-size:16px}
 .fld textarea{height:auto;min-height:70px;padding:var(--sp2)}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 var(--sp2)}
-.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0 var(--sp2)}
+.grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:0 var(--sp2)}
+.grid3{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr);gap:0 var(--sp2)}
 .tri{display:flex;flex-wrap:wrap;gap:var(--sp2)}
 .tri button{border:1px solid var(--line);background:var(--card2);border-radius:var(--r-md);height:32px;padding:0 var(--sp3);font-size:var(--fs-sec)}
 .tri button.yes{border-color:var(--ss);color:var(--ss)}
@@ -164,7 +164,7 @@ tr.best{color:var(--ss)}
 table.fixt{table-layout:fixed}
 .calcrow{display:flex;gap:var(--sp2);align-items:center;margin-bottom:var(--sp2)}
 .calcrow .inline-in{width:96px}
-.selfrow{display:flex;gap:var(--sp2);margin-bottom:var(--sp2)}
+.selfrow{display:flex;gap:var(--sp2);margin-bottom:var(--sp2);flex-wrap:wrap;align-items:center}
 .self{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
 .self span{font-size:var(--fs-sub);color:var(--mut)}
 .self select{width:100%;background:var(--card2);border:1px solid var(--line);border-radius:var(--r-md);height:36px;padding:0 var(--sp2);font-size:14px}
@@ -172,7 +172,8 @@ table.fixt{table-layout:fixed}
 .selbar{position:fixed;left:12px;right:12px;bottom:calc(var(--tabh) + var(--safe) + var(--sp2));z-index:35;background:var(--card2);border:1px solid var(--line);border-radius:var(--r-lg);padding:var(--sp2) var(--sp3);display:flex;gap:var(--sp2);align-items:center;box-shadow:0 6px 18px rgba(0,0,0,.45)}
 .selbar .grow{font-size:13px}
 .grid2>.fld,.grid3>.fld{min-width:0}
-.fld input,.fld select,.fld textarea{min-width:0}
+.fld input,.fld select,.fld textarea{min-width:0;max-width:100%}
+input[type="date"]{min-width:0;max-width:100%}
 .fld label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .grid2,.grid3{align-items:start}
 .tblwrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
@@ -214,9 +215,12 @@ table.fixt{table-layout:fixed}
    データ: localStorage "sedoscope_s_v1"（SedoScope本体 "sedoscope_v1" とは別）
    外部通信: openBD ISBN照会のみ
    ============================================================ */
-const APP_VER='1.4.2';
+const APP_VER='1.4.5';
 const APP_DATE='2026-10-24';
 const CHANGELOG=[
+  'v1.4.5（2026-10-25）一覧の絞り込みをシート方式にした。「絞り込み」ボタンから、ジャンル・出版社・状態に加えて仕入店舗・区分・仕入月でも絞り込める。適用中の条件はボタンの横に表示され、個別に外すこともできる。',
+  'v1.4.4（2026-10-25）見やすさ重視で、表紙画像の表示をやめて全画面で「画像なし」に統一した（一覧・検索候補・集計リスト・調べる画面の見出し）。空の四角が消えた分、一覧のタイトルは2行まで表示するようにした。画像のデータ自体は消していないので、将来戻すこともできる。',
+  'v1.4.3（2026-10-25）セットの編集画面で「束ねた単巻」の行をタップすると、その単巻の編集画面に移れるようにした（移動前に今の編集内容は自動で保存される）。日付などの入力欄が枠からはみ出す問題を、列の幅指定を変えて修正。内部管理用の項目が「その他の保存項目」に表示されないようにした。',
   'v1.4.2（2026-10-25）一覧の選択モードで、選んだ冊数と「セットとして束ねる」ボタンを画面下部に固定表示するようにし、上までスクロールしなくても束ねられるようにした。',
   'v1.4.1（2026-10-25）編集画面の項目のズレを修正（ラベルを1行に統一し、長い補足は項目名から外した）。区分・出版社・ジャンル・状態・仕入店舗を選択制にし（新しい値はその場で追加も可能）、ステータスの横に発行部数を追加。仕入店舗は設定で店舗マスターに登録して選べるようにした。一覧のチェックボックスは「選択」モードのときだけ表示するよう変更。',
   'v1.4.0（2026-10-25）判定の相場グループ化を「同じ商品名→同じ巻範囲」の2段構えに変更し、名前が一致しない相場も巻範囲が同じなら使えるようにした。カゴの束ねはセット商品が未登録でも可能にし、一覧でも単巻を選択してセットに束ねられるようにした。編集画面をセクションカード＋2列レイアウトに整理し、保存ボタンを下部に固定。販路別などの表をはみ出す場合に横スクロールできるようにした。',
@@ -508,7 +512,7 @@ async function fetchBiblio(isbn){
 /* ============================================================
    画面
    ============================================================ */
-const UI={scroll:{look:0,cart:0,list:0,stats:0,set:0},tab:'look',listF:'all',listQ:'',listN:150,cartSort:'eff',per:'month',padOpen:true,search:null,listG:'',listP:'',listC:'',statsAxis:'all',cartSel:{},listSel:{},listSelMode:false};
+const UI={scroll:{look:0,cart:0,list:0,stats:0,set:0},tab:'look',listF:'all',listQ:'',listN:150,cartSort:'eff',per:'month',padOpen:true,search:null,listG:'',listP:'',listC:'',listStore:'',listK:'',listM:'',statsAxis:'all',cartSel:{},listSel:{},listSelMode:false};
 let CUR=null;   // 調べている本 {code,title,author,pub,cover,itemId,price,loading,netErr}
 
 function setTab(t){
@@ -559,7 +563,7 @@ function renderResult(){
   const a=analyze(CUR),ev=evalPrice(a,CUR.price),sc=effScore(a,ev),f=a.flags,b=a.best;
   const cover=CUR.cover||(a.it&&itemCover(a.it));
   const sub=[CUR.author,CUR.pub,CUR.code].filter(Boolean).map(esc).join('／');
-  let head=`<div class="bib">${cover?`<img src="${esc(cover)}" alt="" onerror="this.remove()">`:''}<div class="grow">
+  let head=`<div class="bib"><div class="grow">
     <div class="t">${CUR.title?esc(CUR.title):'<span class="mut">書名未取得</span>'}</div><div class="s">${sub}${CUR.loading?'　<span>書誌を取得中…</span>':''}</div>
     ${a.it?`<div class="s"><span class="st ${a.it.st}">${ST[a.it.st]||''}</span>登録済み</div>`:''}</div></div>`;
   if(!CUR.title&&!a.it){
@@ -833,7 +837,7 @@ function listBundleDoAct(b){
   UI.listSel={};save();closeSheet();setTab('list');toast('セットとして束ねました');
 }
 /* ---------- 一覧 ---------- */
-function thumb(it){const c=itemCover(it);return c?`<img src="${esc(c)}" alt="" loading="lazy" onerror="this.outerHTML='<div class=ph></div>'">`:'<div class="ph"></div>'}
+function thumb(it){return ''}
 function soldProfit(it){
   const sp=num(it.soldPrice??it.sp);if(!(sp>0))return NaN;let c=chKey(it.soldCh);if(c==='o')c=S.settings.main;const cs=S.settings.ch[c];
   const fee=isFinite(num(it.soldFee))?num(it.soldFee):Math.round(sp*num(cs.fee)/100);
@@ -857,13 +861,16 @@ function listHTML(){
   if(UI.listG)arr=arr.filter(it=>(it.genre||'')===UI.listG);
   if(UI.listP)arr=arr.filter(it=>(it.pub||'')===UI.listP);
   if(UI.listC)arr=arr.filter(it=>(it.cond||'')===UI.listC);
+  if(UI.listStore)arr=arr.filter(it=>(it.store||'')===UI.listStore);
+  if(UI.listK)arr=arr.filter(it=>(it.setk||'')===UI.listK);
+  if(UI.listM)arr=arr.filter(it=>String(it.date||'').slice(0,7)===UI.listM);
   const cnt=k=>k==='all'?S.items.length:S.items.filter(i=>i.st===k).length;
   const memCnt={};for(const i of S.items)if(i.inSet)memCnt[i.inSet]=(memCnt[i.inSet]||0)+1;
   const selN=Object.keys(UI.listSel).filter(k=>UI.listSel[k]).length;
   const shown=arr.slice(0,UI.listN);
   return `<div class="srch"><input id="lq" type="search" placeholder="タイトル・ISBN・タグ・店舗で絞り込み" value="${esc(UI.listQ)}"><button class="btn ${UI.listSelMode?'pri':''}" data-act="listSelMode">${UI.listSelMode?'選択中':'選択'}</button><button class="btn pri" data-act="newItem">＋新規</button></div>
   <div class="fchips">${[['all','全部'],['cand','候補'],['stock','仕入済'],['listed','出品中'],['sold','売却済'],['re','再調査']].map(([k,l])=>`<button class="${f===k?'on':''}" data-act="listF" data-v="${k}">${l}${k!=='re'?' '+cnt(k):''}</button>`).join('')}</div>
-  ${(()=>{const vs=k2=>[...new Set(S.items.map(i=>String(i[k2]||'')).filter(Boolean))].sort();const sel=(k2,lb,v)=>vs(k2).length?`<label class="self"><span>${lb}</span><select data-lsel="${k2}"><option value="">すべて</option>${vs(k2).map(x=>`<option${x===v?' selected':''}>${esc(x)}</option>`).join('')}</select></label>`:'';return `<div class="selfrow">${sel('genre','ジャンル',UI.listG)}${sel('pub','出版社',UI.listP)}${sel('cond','状態',UI.listC)}</div>`})()}
+  ${(()=>{const af=[['ジャンル',UI.listG,'listG'],['出版社',UI.listP,'listP'],['状態',UI.listC,'listC'],['仕入店舗',UI.listStore,'listStore'],['区分',UI.listK,'listK'],['仕入月',UI.listM,'listM']].filter(x=>x[1]);return `<div class="selfrow"><button class="btn sm" data-act="listFilterOpen">絞り込み${af.length?`（${af.length}）`:''}</button>${af.map(([lb,v,k])=>`<span class="chip">${lb}：${esc(v)} <a href="#" data-act="listFilterClear" data-k="${k}">✕</a></span>`).join('')}</div>`})()}
   ${f==='re'?'<div class="note mb2">最新の売り切れから'+esc(S.settings.fresh)+'日を超えた（または日付不明の）作品です。相場を取り直して取り込んでください。</div>':''}
   <div class="list">${shown.map(it=>{
     let right='';
@@ -892,6 +899,12 @@ const FIELDS=[
   ['tags','タグ','text'],['memo','メモ','area']
 ];
 let EDIT=null;
+function listFilterSheet(){
+  const vs=k=>[...new Set(S.items.map(i=>String(i[k]||'')).filter(Boolean))].sort();
+  const months=[...new Set(S.items.map(i=>String(i.date||'').slice(0,7)).filter(x=>/^\d{4}-\d{2}$/.test(x)))].sort().reverse();
+  const sel=(k,lb,vals,v)=>vals.length?`<div class="fld"><label>${lb}</label><select data-lsel="${k}"><option value="">すべて</option>${vals.map(x=>`<option${x===v?' selected':''}>${esc(x)}</option>`).join('')}</select></div>`:'';
+  const body=sel('genre','ジャンル',vs('genre'),UI.listG)+sel('pub','出版社',vs('pub'),UI.listP)+sel('cond','状態',vs('cond'),UI.listC)+sel('store','仕入店舗',vs('store'),UI.listStore)+sel('setk','区分',vs('setk'),UI.listK)+sel('month','仕入月',months,UI.listM);
+  return (body||'<div class="note">絞り込める項目がまだありません（ジャンルや店舗などの値が入ると、ここに出ます）</div>')+`<div class="btns mt3"><button class="btn" data-act="listFilterClearAll">すべてクリア</button><button class="btn pri" data-act="closeSheet">閉じる</button></div>`}
 function openSheet(title,html){$('#shT').textContent=title;$('#shB').innerHTML=html;$('#sheet').hidden=false;$('#shB').scrollTop=0}
 function closeSheet(){$('#sheet').hidden=true;EDIT=null}
 function openItem(id,prefill){
@@ -932,7 +945,7 @@ function drawEditor(){
   <div class="note mt1">「なし」の項目は設定の割引率で想定売価を下げます。</div></div>`;
   // 束ねた単巻
   const mem=S.items.filter(i2=>i2.inSet===e.id);
-  if(mem.length)h+=`<div class="edsec"><div class="edh">束ねた単巻（${mem.length}冊）</div>${mem.map(m=>`<div class="qrow"><span>${esc(m.name)}</span><span class="num">${yenT(num(m.cost))}</span></div>`).join('')}<div class="btns mt2"><button class="btn sm" data-act="unbundleItem">束ねを解除する</button></div></div>`;
+  if(mem.length)h+=`<div class="edsec"><div class="edh">束ねた単巻（${mem.length}冊）</div>${mem.map(m=>`<div class="qrow" data-act="openMember" data-id="${esc(m.id)}" style="cursor:pointer"><span>${esc(m.name)}</span><span class="num">${yenT(num(m.cost))} ›</span></div>`).join('')}<div class="btns mt2"><button class="btn sm" data-act="unbundleItem">束ねを解除する</button></div></div>`;
   // 相場
   const qs=(e.quotes||[]).slice().reverse();
   h+=`<div class="edsec"><div class="edh">この商品の相場（${qs.length}件・作品単位で共有されます）</div>
@@ -942,7 +955,7 @@ function drawEditor(){
   <div class="grid2"><div class="fld"><label>状態</label><input id="nqD" placeholder="目立った傷なし 等"></div><div class="fld"><label>確認日</label><input id="nqT" type="date" value="${today()}"></div></div>
   <div class="btns"><button class="btn" data-act="addQuote">相場を追加</button><button class="btn" data-act="csvForEdit">相場CSVを取り込む</button></div>
   <div class="mt2">${qs.slice(0,80).map(q=>`<div class="qrow"><span>${q.status==='sold'?'売切':q.status==='listing'?'出品中':'不明'}・${esc(q.ch&&q.ch!=='o'?S.settings.ch[q.ch].name:q.src||'')}・${esc(q.cond||'')}<br><span class="mut">${esc(q.title||'')}</span></span><span class="num">${yenT(q.price)}<br><span class="mut">${esc(q.date||'')}</span></span></div>`).join('')}${qs.length>80?`<div class="note">ほか${qs.length-80}件</div>`:''}</div></div>`;
-  const extra=Object.keys(e).filter(k=>!FIELDS.some(f=>f[0]===k)&&!['id','quotes','acc','created','_isNew','cover'].includes(k));
+  const extra=Object.keys(e).filter(k=>!FIELDS.some(f=>f[0]===k)&&!['id','quotes','acc','created','_isNew','cover','autoBundle','inSet'].includes(k));
   if(extra.length)h+=`<div class="note mt3">その他の保存項目（表示のみ・そのまま保持）：${esc(extra.join(', '))}</div>`;
   h+=`<div class="btns edfoot"><button class="btn pri" data-act="saveItem">保存</button><button class="btn" data-act="judgeItem">保存して判定を見る</button>${e._isNew?'':`<button class="btn dng" data-act="delItem">削除</button>`}</div>`;
   openSheet(e._isNew?'新規商品':(e.name||'商品'),h);
@@ -1290,8 +1303,12 @@ const ACT={
   buyAll(){if(confirm(`カゴの${S.queue.length}冊を購入登録しますか？`))buyRows(S.queue.map(q=>q.id))},
   listBundle(){listBundleMake()},
   listBundleDo(b){listBundleDoAct(b)},
+  listFilterOpen(){openSheet('絞り込み',listFilterSheet())},
+  listFilterClear(b){UI[b.dataset.k]='';render()},
+  listFilterClearAll(){UI.listG='';UI.listP='';UI.listC='';UI.listStore='';UI.listK='';UI.listM='';closeSheet();render()},
   listSelMode(){UI.listSelMode=!UI.listSelMode;if(!UI.listSelMode)UI.listSel={};render()},
   listSelClear(){UI.listSel={};render()},
+  openMember(b){const sv=saveEditor();if(sv)openItem(b.dataset.id)},
   unbundleItem(){if(!EDIT)return;const id=EDIT.id;S.items.forEach(m=>{if(m.inSet===id)delete m.inSet});
     if(EDIT.autoBundle){S.items=S.items.filter(x=>x.id!==id);save();closeSheet();toast('束ねを解除しました');render();return}
     const e2=getItem(id);if(e2){e2.st='cand';e2.cost=''}save();closeSheet();toast('束ねを解除しました');render()},
@@ -1349,7 +1366,7 @@ document.addEventListener('change',e=>{
     if(el.type!=='checkbox'&&el.inputMode&&/numeric|decimal/.test(el.inputMode)&&k!=='budget'){const n=num(v);v=isFinite(n)?n:o[k]}
     o[k]=v;save();if(UI.tab!=='look')render();else renderResult();return}
   if(el.dataset.lsel2!==undefined){UI.listSel[el.dataset.lsel2]=el.checked;render();return}
-  if(el.dataset.lsel!==undefined){const v=el.value;if(el.dataset.lsel==='genre')UI.listG=v;else if(el.dataset.lsel==='pub')UI.listP=v;else UI.listC=v;UI.listN=150;render();return}
+  if(el.dataset.lsel!==undefined){const v=el.value;const mp={genre:'listG',pub:'listP',cond:'listC',store:'listStore',setk:'listK',month:'listM'};const uk=mp[el.dataset.lsel];if(uk){UI[uk]=v;UI.listN=150;render()}return}
   if(el.dataset.qsel!==undefined){UI.cartSel[el.dataset.qsel]=el.checked;render();return}
   if(el.dataset.qprice){const q=S.queue.find(x=>x.id===el.dataset.qprice);if(q){const n=num(el.value);q.price=isFinite(n)?n:'';save();render()}return}
   if(el.dataset.link!==undefined){const l=S.links[+el.dataset.link];if(l){l[el.dataset.k]=el.value;save()}return}
