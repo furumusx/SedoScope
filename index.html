@@ -56,7 +56,15 @@ button.dz{background:var(--ng);color:#fff;border-color:var(--ng)}
    保存キー sedoscope_v1 と既存データはそのまま使う。既存の項目は削除・変更しない。
    v3で増える項目: 商品 … genre(ジャンル) ship(送料) pr/pa(ラクマ/ヤフオク想定売価) lc/lp/ldate(出品先/出品価格/出品日)
                   設定 … trate(目標利益率) rr/ra(ラクマ/ヤフオク手数料率) ship(送料初期値) */
-const APP_VER='2026-10-23 夜';
+/* 変更履歴
+   2026-10-24 相場プール: 「すべて」(仕入候補=倉庫)を作品・巻ごとの相場プールとして使う(新しい保存項目なし。db.items の quotes をそのまま利用)
+              調べる … JAN/ISBN → 照合キー(作品名+巻、表記ゆれを吸収) → 部分一致 の順で倉庫を照合し「⚡ 判定」で選べる。倉庫の相場から仮判定、上限との差額を表示
+              在庫に追加 … 倉庫の商品はコピーして在庫を作る(倉庫の相場は残す)
+              取り込み … 「AIの結果でまとめて記録」。出どころ選択、CSVファイル読み込み、作品名の自動読み取り(複数作品を1つのCSVで)、結果サマリ(追加・重複・読み取れない行)
+              設定 … 相場プール(倉庫)の一覧・作品ごとの削除・全削除・CSV出力(取り込みと同じ列)
+              カメラ … 読み取り後もカメラを60秒保持し、次の読み取りをすぐ始める
+              鮮度 … 最終調査日が「売れ残りのお知らせ」日数を超えた相場に警告。集計に「再調査リスト」 */
+const APP_VER='2026-10-24 相場プール';
 const KEY='sedoscope_v1';
 const ST={cand:'仕入候補',bought:'仕入済み',listed:'出品中',sold:'売却済み'};
 const CH={m:'メルカリ',y:'Yahoo!フリマ',r:'楽天ラクマ',a:'ヤフオク'},CK=Object.keys(CH);
@@ -71,7 +79,7 @@ const KL={sold:'売り切れ',listing:'出品中'},TL={h:'高',m:'中',l:'低'};
 const NUM=['bn','bp','cost','ship','pack','other','pm','py','pr','pa','pmlo','pmhi','pylo','pyhi','prlo','prhi','palo','pahi','lp','ap','afee','aship','apack','aother'];
 let db,view='res',prev='res',cur=null,saveOK=true;
 let lf='all',ls='new',l30=false,lq='',ltag='';
-let shOpen=false,rq='',rob=null,rid=0,qc='m',qk='sold',imp=null,qOpen=false,ck=null,ckLog=[];
+let shOpen=false,ckSel=null,rq='',rob=null,rid=0,qc='m',qk='sold',imp=null,qOpen=false,ck=null,ckLog=[];
 const $=s=>document.querySelector(s);
 /* 確認・お知らせはアプリの画面内に表示する(iPhoneはブラウザのポップアップを止めることがあり、止まると「キャンセル」扱いになるため) */
 let dlgFn=null;
@@ -122,7 +130,7 @@ function load(){try{const r=localStorage.getItem(KEY);db=r?JSON.parse(r):def()}c
  db.items.forEach(i=>{if(i.ship==null){const v=i.sm!=null&&i.sm!==''?i.sm:i.sy;i.ship=v==null?'':String(v)}if(i.genre==null)i.genre=GEN.includes(i.cat)?i.cat:'';
   /* 以前の想定売価(1つの値)は、下限・上限の両方に入れる */
   CK.forEach(c=>{if(i['p'+c+'lo']==null&&i['p'+c+'hi']==null&&N(i['p'+c])!=null){i['p'+c+'lo']=String(N(i['p'+c]));i['p'+c+'hi']=String(N(i['p'+c]))}})})}
-function save(skip){if(!skip)db.meta.changes++;try{localStorage.setItem(KEY,JSON.stringify(db))}catch(e){saveOK=false;alert('保存できません。プライベートブラウズ中か容量不足の可能性があります。バックアップを取ってください。')}}
+function save(skip){veCache=new Map();if(!skip)db.meta.changes++;try{localStorage.setItem(KEY,JSON.stringify(db))}catch(e){saveOK=false;alert('保存できません。プライベートブラウズ中か容量不足の可能性があります。バックアップを取ってください。')}}
 function touch(){cur.updated=new Date().toISOString();save()}
 
 /* ===== 相場・信頼度・売れやすさ ===== */
@@ -143,6 +151,7 @@ function mkt(i,c){
  const base=use;
  if(i.cond){const same=base.filter(q=>q.cond===i.cond);if(same.length)use=same;else mixed=true}
  else mixed=new Set(base.map(q=>q.cond||'')).size>1;
+ {const fr=use.filter(q=>dayAgo(q.d)<=30);if(fr.length>=3)use=fr} /* 30日以内に3件以上あれば、新しい記録だけで計算 */
  use=use.slice().sort(byD).reverse().slice(0,20); /* 新しい順に最大20件 */
  const p=use.map(q=>q.price);Object.assign(r,{n:use.length,p:med(p),min:Math.min(...p),max:Math.max(...p),age:dayAgo(use[0].d),mixed});
  if(r.n<3)r.why.push('売り切れ'+r.n+'件のみ');else if(r.n<5)r.why.push('売り切れ'+r.n+'件');
@@ -156,7 +165,24 @@ const trustB=m=>m&&m.n?`<span class="bd t${m.t}">信頼度 ${TL[m.t]}</span>`:''
 /* ===== 利益計算 ===== */
 /* 想定売価: 下限〜上限の中央値。片方だけならその値。なければ相場の中央値 */
 const rangeMid=(i,c)=>{const a=N(i['p'+c+'lo']),b=N(i['p'+c+'hi']);if(a==null&&b==null)return null;if(a==null||b==null)return a==null?b:a;return Math.round((Math.min(a,b)+Math.max(a,b))/2)};
-function priceOf(i,c){const r=rangeMid(i,c);if(r!=null)return{v:r,src:'手入力'};const v=(i['p'+c+'lo']==null&&i['p'+c+'hi']==null)?N(i['p'+c]):null;if(v!=null)return{v,src:'手入力'};const m=mkt(i,c);return m.n?{v:Math.round(m.p),src:'相場',m}:null}
+/* ===== 1冊あたりの相場: 同じ作品のセット記録(2冊以上)をまとめ、売れた価格÷冊数の中央値で、どの範囲のセットでも売価を推定 ===== */
+let veCache=new Map();
+const workKey=i=>baseName(i).replace(/\s+/g,'').toLowerCase();
+const lastSurvey=i=>{const a=qOf(i).filter(q=>!q.void).map(q=>String(q.d||'').slice(0,10)).filter(Boolean).sort();return a.length?a[a.length-1]:null};
+function volCount(i){const v=String(i.vols||'').replace(/[０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-65248));const m=v.match(/(\d+)\s*[〜~\-－ー‐]\s*(\d+)/);if(m){const a=+m[1],b=+m[2];return b>=a?b-a+1:null}const n=v.match(/^\s*(\d+)\s*巻?\s*$/);return n?1:null}
+function volPool(i,c){const wk=workKey(i);if(!wk)return null;const single=volCount(i)===1,key=wk+'\u0001'+c+'\u0001'+single;if(veCache.has(key))return veCache.get(key);
+ const recs=[];db.items.forEach(x=>{if(workKey(x)!==wk)return;const n=volCount(x);if(!n||(single?n!==1:n<2))return;dd(qOf(x).filter(q=>!q.void&&q.kind==='sold'&&q.cond!=='新品・未使用')).forEach(q=>recs.push({c:qch(q),v:vkey(q.tags),pv:q.price/n,d:q.d}))});
+ {const fr=recs.filter(r=>dayAgo(r.d)<=30);if(fr.length>=3){veCache.set(key,fr);return fr}}
+ veCache.set(key,recs);return recs}
+function volEst(i,c){const n=volCount(i);if(!n)return null;const all=volPool(i,c);if(!all||!all.length)return null;
+ let a=all.filter(r=>r.c===c),why=[];if(a.length<2&&all.length>a.length){a=all;why.push('ほかの販路の記録も使用')}
+ const iv=vkey(i.tags);let lab=iv,b=a.filter(r=>r.v===iv);if(b.length<2&&iv!=='通常'){const b2=a.filter(r=>r.v==='通常');if(b2.length>b.length){b=b2;lab='通常';why.push('「'+iv+'」の記録が少なく、通常の価格で計算')}}
+ if(!b.length)return null;const pv=med(b.map(r=>r.pv));return{pv,n:b.length,cnt:n,est:Math.round(pv*n),v:lab,why,t:b.length>=5&&!why.length?'m':'l'}}
+function priceOf(i,c){const r=rangeMid(i,c);if(r!=null)return{v:r,src:'手入力'};const v=(i['p'+c+'lo']==null&&i['p'+c+'hi']==null)?N(i['p'+c]):null;if(v!=null)return{v,src:'手入力'};const m=mkt(i,c),e=volEst(i,c);
+ if(m.n>=3&&!m.mixed)return{v:Math.round(m.p),src:'相場',m};
+ if(e&&e.n>=3&&!(e.cnt===1&&m.n))return{v:e.est,src:'1冊相場',e,m}; /* 単巻は自分の巻の記録があればそれを優先 */
+ if(m.n)return{v:Math.round(m.p),src:'相場',m};
+ return e?{v:e.est,src:'1冊相場',e}:null}
 /* 送料: 商品に入力した送料。空欄なら「設定」の送料を使う */
 const shipP=(n,c)=>{const x=n&&db.set.ships.find(z=>z&&z.n===n);const v=x&&x.p?N(x.p[c]):null;return v!=null&&v>=0?v:null};
 /* 送料: 配送方法を選んでいれば、その販路の送料。なければ商品の送料欄、空欄なら「設定」の送料 */
@@ -169,7 +195,7 @@ function calc(i,c,borrow){
  const rate=db.set['r'+c];if(!pr)return{c,none:'売価なし'};if(rate==null)return{c,none:'手数料率未設定',price:pr.v,src:pr.src,m:pr.m};
  const price=pr.v,fee=feeOf(price,rate),sh=shipV(i,c),pk=N(i.pack)||0,ot=N(i.other)||0,exp=sh.v+pk+ot,cost=N(i.cost);
  const need=Math.ceil(price*db.set.trate/100); /* 判定は利益率のみ(利益÷売価が目標以上) */
- const r={c,price,src:pr.src,m:pr.m,fee,exp,ship:sh.v,shipDef:sh.def,shipM:sh.m,bw,pack:pk,other:ot,cost,limit:price-fee-exp-need};
+ const r={c,price,src:pr.src,m:pr.m,fee,exp,ship:sh.v,shipDef:sh.def,shipM:sh.m,bw,e:pr.e,pack:pk,other:ot,cost,limit:price-fee-exp-need};
  if(cost!=null){r.profit=price-fee-exp-cost;r.rate=price>0?r.profit/price*100:null;r.ok=r.profit>0&&r.rate!=null&&r.rate>=db.set.trate}
  return r}
 function best(i,any){const mc=db.set.mainCh;if(!any&&mc&&mc!=='best'){const r=calc(i,mc,true);if(!r.none)return r}let b=null;CK.forEach(c=>{const r=calc(i,c);if(r.none)return;const v=r.profit!=null?r.profit:r.limit,bv=b&&(b.profit!=null?b.profit:b.limit);if(!b||v>bv)b=r});return b}
@@ -214,7 +240,7 @@ function varLine(i){const sold=dd(qOf(i).filter(q=>!q.void&&q.kind==='sold'));if
 function whEdit(i){return `<button data-a="open" data-id="${i.id}" style="position:absolute;top:8px;right:8px;min-height:36px;padding:0 10px;font-size:13px">✎ 編集</button>`}
 function whBody(i){const b=best(i);let lo=null,hi=null;
  if(b){const c=b.c,h=N(i['p'+c+'hi']),l=N(i['p'+c+'lo']);if(b.src==='手入力'){hi=h??l;lo=l??h;if(hi==null&&lo==null){hi=lo=b.price}}else if(b.m&&b.m.n){hi=b.m.max;lo=b.m.min}if(lo!=null&&hi!=null&&lo>hi)[lo,hi]=[hi,lo]}
- return `<div>仕入目安：<b>${b?(b.limit<0?'<span class="ng">不可</span>':'〜'+yen(b.limit)):'—'}</b></div><div>売価相場：<b>${lo==null?'—':lo===hi?yen(lo):yen(lo)+' 〜 '+yen(hi)}</b></div>`}
+ return `<div>仕入目安：<b>${b?(b.limit<0?'<span class="ng">不可</span>':'〜'+yen(b.limit)):'—'}</b></div><div>売価相場：<b>${b&&b.src==='1冊相場'?'約'+yen(b.price):lo==null?'—':lo===hi?yen(lo):yen(lo)+' 〜 '+yen(hi)}</b>${b&&b.src==='1冊相場'?` <span class="mu">(${b.e.cnt===1?'ほかの巻もふくむ単巻'+b.e.n+'件から推定':'1冊 '+yen(b.e.pv)+'×'+b.e.cnt+'冊・'+b.e.n+'件から推定'})</span>`:''}${lo==null&&!(b&&b.src==='1冊相場')?(()=>{const l=dd(qOf(i).filter(q=>!q.void&&q.kind==='listing')).map(q=>q.price);if(!l.length)return'';const a=Math.min(...l),b2=Math.max(...l);return ` <span class="mu">(出品中のみ ${a===b2?yen(a):yen(a)+'〜'+yen(b2)})</span>`})():''}</div>${(()=>{const d=lastSurvey(i);if(!d)return'';const g=dayAgo(d),o=g>db.set.stale;return `<div class="mu ${o?'wn':''}">調査日 ${d.slice(5).replace('-','/')}(${g===0?'今日':g+'日前'})${o?' ⚠ 相場が古いです':''}</div>`})()}`}
 /* 表示タイトル: 【初版・帯付き】+ 商品名 + 巻数(商品名に巻数がなければ足す)。入力した商品名そのものは変えない */
 const baseName=i=>String(i.name||'').replace(/^【[^】]*】\s*/,'').trim();
 function volName(i){const b=baseName(i),v=String(i.vols||'').trim();if(!v)return b;const vn=v.replace(/巻$/,'');if(b.includes(vn+'巻')||new RegExp('(^|[^\\d])'+vn.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\s*巻?\\s*(セット)?$').test(b))return b;return (b?b+' ':'')+vn+(/\d$/.test(vn)?'巻':'')}
@@ -291,23 +317,35 @@ function ckResHtml(it){const r=ckEval(it),T=db.set.target,R=db.set.trate;
  if(!r)return `<div class="mu">${it?'この商品は売価が分かっていません。商品を開いて相場を記録してください。':'売れている価格を入れると判定します。'}</div>`;
  const lim=`<div>仕入上限 <b class="big">${r.limit<0?'<span class="ng">不可</span>':yen(r.limit)}</b> <span class="mu">${CH[r.c]} ${yen(r.price)}で売る場合${r.bw?'('+CH[r.bw]+'の売価)':''}</span></div>`;
  if(r.profit==null)return lim+brk(r)+`<div class="mu">店頭価格を入れると○×を判定します。</div>`;
- return `<div class="lim ${r.ok?'ok':'ng'}">${r.ok?'○ 仕入OK':'× 見送り'}</div>${lim}<div>予想利益 <b class="${r.ok?'ok':'ng'}">${yen(r.profit)}</b> 利益率 <b>${pct(r.rate)}</b> <span class="mu">(基準 利益率${R}%以上)</span></div>${brk(r)}`}
+ const df=r.limit-N(ck.cost);
+ return `<div class="lim ${r.ok?'ok':'ng'}">${r.ok?'○ 仕入OK':'× 見送り'}</div><div class="${df>=0?'ok':'ng'}" style="font-weight:700">${df>=0?'上限まで あと'+yen(df):'上限を'+yen(-df)+'超えています'}</div>${lim}<div>予想利益 <b class="${r.ok?'ok':'ng'}">${yen(r.profit)}</b> 利益率 <b>${pct(r.rate)}</b> <span class="mu">(基準 利益率${R}%以上)</span></div>${brk(r)}`}
+/* 店頭チェック用の相場サマリ(販路ごと): 売り切れ中央値・件数・信頼度・最新の調査日 + 1冊あたりの推定 */
+function mktSum(it){const rows=CK.map(c=>{const m=mkt(it,c);if(!m.n)return'';return `<div class="mu">${CH[c]}:売り切れ中央値 <b>${yen(m.p)}</b>(${m.n}件・最新${m.age===0?'今日':m.age+'日前'}) ${trustB(m)}${m.why.length?'<br><span class="wn">'+esc(m.why.join('・'))+'</span>':''}</div>`}).join('');
+ const e=volEst(it,db.set.mainCh&&db.set.mainCh!=='best'?db.set.mainCh:'m');const es=e?`<div class="mu">${e.cnt===1?'単巻の相場(ほかの巻もふくむ)':'1冊あたり '+yen(e.pv)+' × '+e.cnt+'冊'}:約<b>${yen(e.est)}</b>(${e.n}件)</div>`:'';
+ const ls=lastSurvey(it),g=ls?dayAgo(ls):null,old=g!=null&&g>db.set.stale?`<div class="wn mu">⚠ 相場が古いです(最終調査 ${ls.slice(5).replace('-','/')}・${g}日前)</div>`:'';
+ return (rows||es)?`<div style="margin-top:6px;padding:8px;border:1px dashed var(--bd);border-radius:10px">${rows}${es}${old}</div>`:`<div class="wn mu" style="margin-top:6px">この商品には売り切れの相場がまだありません。</div>`}
 function ckHtml(it){
  const fi=(k,l,x='')=>`<div><label>${l}</label><input data-ck="${k}" value="${esc(ck[k])}" ${x}></div>`;
- return `<div class="card"><b>⚡ 店頭チェック</b>${it?`<div style="margin-top:4px"><b>${dn(it)}</b> <span class="mu">${ST[it.st]}</span>${vlist(it.tags).length?`<div>${vlist(it.tags).map(x=>`<span class="bd">${esc(x)}</span>`).join('')}</div>`:''}${varLine(it)}</div>`:'<div class="mu">登録しなくても判定できます。</div>'}`
+ return `<div class="card"><b>⚡ 店頭チェック</b>${it?`<div style="margin-top:4px"><b>${dn(it)}</b> <span class="mu">${it.st==='cand'?'倉庫(すべて)':ST[it.st]}</span>${it.st==='cand'?' <span class="bd tm">倉庫の相場から仮判定</span>':''}${vlist(it.tags).length?`<div>${vlist(it.tags).map(x=>`<span class="bd">${esc(x)}</span>`).join('')}</div>`:''}${mktSum(it)}${varLine(it)}</div>`:'<div class="mu">登録しなくても判定できます。</div>'}`
  +(it?`<div class="g2">${fi('cost','店頭価格(円)','inputmode="numeric"')}${fi('ship','送料(円)','inputmode="numeric"')}</div>${shipBtns('ck',ck.shipm)}`
    :`<div class="g2">${fi('cost','店頭価格(円)','inputmode="numeric"')}${fi('ship','送料(円)','inputmode="numeric"')}</div>${shipBtns('ck',ck.shipm)}<div class="g2">${fi('price','売れている価格(円)','inputmode="numeric"')}<div><label>売る販路</label><select data-ck="c">${opts(CK.map(c=>[c,CH[c]]),ck.c)}</select></div></div>`)
  +`<details style="margin-top:6px"><summary>🧮 まとめ買いの電卓</summary><div id="calbox-ck">${calHtml('ck')}</div></details>`
  +`<div id="ckres" style="margin-top:10px">${ckResHtml(it)}</div>`
  +(it?`<div class="mu" style="margin-top:8px">仕入先</div><div class="chips" style="flex-wrap:wrap;overflow:visible;margin:4px 0 0">${[...new Set([...db.set.stores,...(ck.store?[ck.store]:[])])].map(x=>`<button data-a="ckstore" data-v="${esc(x)}" class="${ck.store===x?'on':''}">${esc(x)}</button>`).join('')}</div>`:'')
- +`<div class="row">${it?`<button class="p" data-a="ckstock" data-id="${it.id}">📦 ${it.st==='cand'?'在庫に移す':'もう1冊追加'}</button>`:`<button data-a="ckreg">候補として登録</button>`}<button data-a="cknext">📷 次の商品</button></div></div>`}
+ +`<div class="row">${it?`<button class="p" data-a="ckstock" data-id="${it.id}">📦 ${it.st==='cand'?'在庫に追加':'もう1冊追加'}</button>`:`<button data-a="ckreg">候補として登録</button>`}<button data-a="cknext">📷 次の商品</button></div></div>`}
 function ckLogHtml(){if(!ckLog.length)return'';
  return `<details class="card" style="padding:0 12px"><summary>今回チェックした商品(${ckLog.length}件)</summary>${ckLog.slice().reverse().map(x=>`<div class="kv"${x.id?` data-a="open" data-id="${x.id}"`:''}><span>${esc(x.name)}<br><span class="mu">店頭 ${yen(N(x.cost))}${x.p!=null?' / 予想利益 '+yen(x.p):''}</span></span><b class="${x.v==='○'?'ok':x.v==='×'?'ng':'mu'}">${x.v}</b></div>`).join('')}<p class="mu">この一覧はアプリを閉じると消えます。残したい商品は「候補として登録」してください。</p></details>`}
 function ckPush(it){const r=ckEval(it);ckLog.push({name:it?(dispName(it)||it.code||'(商品名未入力)'):(rob&&rob.ok?rob.title:rq),id:it&&it.id,cost:ck.cost,p:r&&!r.err&&r.profit!=null?r.profit:null,v:r&&!r.err&&r.profit!=null?(r.ok?'○':'×'):'—'});if(ckLog.length>100)ckLog.shift()}
-function ckItem(){const raw=rq.trim();if(!raw)return null;const r=chkCode(raw);
- if(r.ok){const a=db.items.filter(i=>i.code&&nc(i.code)===r.code);return a.find(i=>i.st==='cand')||a[0]||null}
- if(/^[\d-]{8,}X?$/i.test(norm(raw)))return null;const k=raw.toLowerCase(),a=db.items.filter(i=>[dispName(i),i.name,i.code,i.store,i.genre,i.pub,i.author].join(' ').toLowerCase().includes(k));
- return a.length===1?a[0]:(a.filter(i=>i.st==='cand').length===1?a.find(i=>i.st==='cand'):null)}
+/* 照合キー: 全角→半角、範囲記号→「〜」、空白・「巻」「セット」を除いて比べる(「ブルーロック 12」でも「ブルーロック12巻」に一致) */
+const nkey=t=>String(t||'').replace(/[０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-65248)).replace(/(\d)\s*巻?\s*[～~\-－ー‐]\s*(\d)/g,'$1〜$2').replace(/【[^】]*】/g,'').replace(/(全巻|途中)?セット/g,'').replace(/巻/g,'').replace(/\s+/g,'').toLowerCase();
+const ikey=i=>nkey(volName(i));
+function ckMatches(){const raw=rq.trim();if(!raw)return[];const r=chkCode(raw);
+ if(r.ok)return db.items.filter(i=>i.code&&nc(i.code)===r.code);
+ if(/^[\d-]{8,}X?$/i.test(norm(raw)))return[];
+ const qk=nkey(raw),ex=db.items.filter(i=>!i.inSet&&ikey(i)===qk);if(ex.length)return ex;
+ const k=raw.toLowerCase();return db.items.filter(i=>!i.inSet&&([dispName(i),i.name,i.code,i.store,i.genre,i.pub,i.author].join(' ').toLowerCase().includes(k)||ikey(i).includes(qk)))}
+function ckItem(){if(ckSel){const x=byId(ckSel);if(x)return x}const a=ckMatches();if(!a.length)return null;
+ const c=a.filter(i=>i.st==='cand');return a.length===1?a[0]:(c.length===1?c[0]:(new Set(a.map(ikey)).size===1?(c[0]||a[0]):null))}
 
 /* ===== 🔍 調べる ===== */
 function bakDays(){const b=db.meta.lastBackup;return b?dayAgo(b):null}
@@ -323,10 +361,10 @@ function linksHtml(k){if(!k){const L=(u,t)=>`<a class="lb" href="${u}" target="_
 function resHtml(){
  const raw=rq.trim(),stl=db.items.filter(staleInfo).length;if(!raw)return `<div class="card mu">バーコードを読み取るか、商品名を入れて「調べる」を押してください。<br>登録済みの商品なら、仕入上限と予想利益をすぐ表示します。</div>`+(stl?`<div class="card wn" data-a="go" data-v="sum">⚠ 売れ残りの在庫が${stl}件あります。「集計」で確認できます。</div>`:'')+ckLogHtml();
  const r=chkCode(raw),code=r.ok?r.code:'',k=raw.toLowerCase();
- const hit=db.items.filter(i=>code?(i.code&&nc(i.code)===code):[dispName(i),i.name,i.code,i.store,i.genre,i.pub,i.author].join(' ').toLowerCase().includes(k)).slice(0,10);
+ const hit=ckMatches().slice(0,15);
  let h='';const ci=ckItem();if(!ck||ck.key!==raw){ck=ckNew(raw,ci);calRows.ck=calNew()}h+=ckHtml(ci);
- if(hit.length)h+=`<h2>登録済みの商品(${hit.length}件)</h2>`+hit.map(i=>itemCard(i)).join('');
- else h+=`<div class="card mu">登録済みの商品には見つかりませんでした。</div>`;
+ if(hit.length)h+=`<h2>見つかった商品(${hit.length}件)</h2><div class="card">${hit.map(i=>`<div class="kv" style="align-items:center"><span data-a="open" data-id="${i.id}" style="flex:1">${dn(i)}<br><span class="mu">${i.st==='cand'?'倉庫(すべて)':ST[i.st]}</span></span><button data-a="cksel" data-id="${i.id}" class="${ci&&ci.id===i.id?'on':''}" style="flex:0 0 auto;min-height:40px">⚡ 判定</button></div>`).join('')}<p class="mu">「⚡ 判定」を押した商品の相場で、上の店頭チェックを計算します。名前を押すと商品の画面が開きます。</p></div>`;
+ else h+=`<div class="card mu">倉庫(すべて)にも登録済みの商品にも見つかりませんでした。</div>`;
  const name=code?(rob&&rob.ok?rob.title:''):raw;
  if(code&&/^97[89]/.test(code))h+=`<div class="card"><b>書名(openBD)</b><div class="mu">${rob?rob.ok?'':esc(rob.msg):'調べています…'}</div>${rob&&rob.ok?`<div>${esc(rob.title)}</div><div class="mu">${esc(rob.author)} / ${esc(rob.pub)}</div>`:''}</div>`;
  if(!(code&&hit.length))h+=`<div class="card"><b>新しく登録</b><div class="mu">${code?'JAN/ISBN: '+esc(code):''}${name?(code?'<br>':'')+'商品名: '+esc(name):''}</div><button class="p" style="width:100%;margin-top:10px" data-a="reg" data-n="${esc(name)}" data-c="${esc(code)}">＋ 仕入候補として登録</button><p class="mu">登録すると、店頭価格の入力や相場の記録ができます。</p></div>`;
@@ -339,7 +377,7 @@ async function fetchOB(c){const ctl=new AbortController(),t=setTimeout(()=>ctl.a
 async function runRes(v){
  if(v!=null)rq=v;else{const e=$('#rq');if(e)rq=e.value}
  const r=chkCode(rq.trim());if(!r.ok&&/^[\d-]{8,}X?$/i.test(norm(rq)))return alert(r.msg||'コードの検査数字が合いません。入力を確認してください。');
- const id=++rid;rob=null;ck=null;view='res';render();
+ const id=++rid;rob=null;ck=null;ckSel=null;view='res';render();
  if(r.ok&&/^97[89]/.test(r.code)&&!db.items.some(i=>i.code&&nc(i.code)===r.code)){const o=await fetchOB(r.code);if(id!==rid)return;rob=o;const e=$('#rres');if(e)e.innerHTML=resHtml()}}
 function register(name,code,ex){
  if(code){const d=dup(code);if(d)return openItem(d.id)}
@@ -367,7 +405,7 @@ function vItem(){
  +`<div id="setbox">${setBoxHtml(i)}</div>`
 
  +`<h2>利益と仕入上限</h2><div id="calc">${calcHtml(i)}</div>`
- +`<h2>想定売価</h2><div class="card">${CK.map(c=>{const m=mkt(i,c),ph=m.n?'相場 '+Math.round(m.p):'';return `<div class="g2" style="grid-template-columns:6.2em 1fr 1fr;align-items:end"><div style="padding-bottom:12px;font-size:14px"><b>${CH[c]}</b></div>${NF('p'+c+'hi','上限(円)',ph)}${NF('p'+c+'lo','下限(円)',ph)}</div>`}).join('')}<div id="lnk">${linksHtml(volName(i)||i.code||'')}</div></div>`
+ +`<h2>想定売価</h2><div class="card">${CK.map(c=>{const pr=priceOf(Object.assign({},i,{['p'+c+'lo']:'',['p'+c+'hi']:'',['p'+c]:''}),c),ph=pr?(pr.src==='1冊相場'?'推定 ':'相場 ')+pr.v:'';return `<div class="g2" style="grid-template-columns:6.2em 1fr 1fr;align-items:end"><div style="padding-bottom:12px;font-size:14px"><b>${CH[c]}</b></div>${NF('p'+c+'hi','上限(円)',ph)}${NF('p'+c+'lo','下限(円)',ph)}</div>`}).join('')}${(()=>{const e=volEst(i,db.set.mainCh&&db.set.mainCh!=='best'?db.set.mainCh:'m');return e?`<div class="mu" style="margin-top:6px">${e.cnt===1?'単巻の相場(ほかの巻もふくむ)':'1冊あたりの相場'}:<b>${yen(e.pv)}</b>(${esc(e.v)}・売り切れ${e.n}件)${e.cnt>1?'→ '+e.cnt+'冊なら約'+yen(e.est):''}${e.why.length?'<br>'+esc(e.why.join('・')):''}</div>`:''})()}<div id="lnk">${linksHtml(volName(i)||i.code||'')}</div></div>`
  +(i.st!=='cand'?`<h2>出品・販売</h2>${saleHtml(i)}`:'')
 
  +(i.st!=='cand'&&!db.items.some(x=>x.st==='cand'&&(x.id===i.fromId||(x.name&&x.name===i.name)))?`<div class="row"><button data-a="towh">📚 この情報を「すべて」(倉庫)にも残す</button></div>`:'')
@@ -434,7 +472,7 @@ function finHtml(i){const f=fin(i),p=N(i.ap),d=sellDays(i);
  return `<div style="margin-top:8px">実利益 <b class="big ${f>=0?'ok':'ng'}">${yen(f)}</b> 利益率 ${p>0?pct(f/p*100):'—'}${d!=null?' / 売れるまで '+d+'日':''}</div>`}
 
 /* ===== CSV取り込み(Geminiの結果) ===== */
-const impNew=()=>({tags:cur?vlist(cur.tags):[],text:'',c:qc,d:nowL(),src:'画面録画→Gemini',rows:null,err:''});
+const impNew=()=>({src:'Muse',mode:'wh',title:'',tags:[],text:'',c:qc,d:nowL(),rows:null,err:''});
 function parseCSV(t){
  t=String(t).replace(/^﻿/,'').replace(/```[a-zA-Z]*/g,'');
  const first=t.split(/\r?\n/).find(x=>x.trim())||'',dl=first.includes('\t')&&!first.includes(',')?'\t':',';
@@ -448,20 +486,33 @@ const kindOf=s=>{s=String(s).replace(/\s/g,'');if(/売り?切れ|売却済|SOLD|
 const condOf=s=>{s=String(s).replace(/\s/g,'');if(!s)return'';if(CONDS.includes(s))return s;
  if(/全体的|悪い/.test(s))return'全体的に状態が悪い';if(/やや/.test(s))return'やや傷や汚れあり';if(/目立った|目立つ傷/.test(s))return'目立った傷や汚れなし';
  if(/未使用に近い/.test(s))return'未使用に近い';if(/新品|未使用/.test(s))return'新品・未使用';if(/^傷や汚れあり$|^傷あり$/.test(s))return'傷や汚れあり';return s};
+/* 倉庫モード: 商品名から巻数を読み取り、作品名+巻ごとに「すべて」の商品へ振り分ける */
+/* 商品名から作品名を取り出す(付加価値・セット区分・巻数・宣伝記号を除く)。作品名の欄が空のときに使う */
+function deriveWork(t){return String(t||'').replace(/[０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-65248)).replace(/帯付き|初版|特典付き/g,' ').replace(/(全巻|途中)?セット/g,' ').replace(/第?\s*\d+\s*巻?\s*[〜~\-－ー‐]\s*\d+\s*巻?/g,' ').replace(/第?\s*\d+\s*巻/g,' ').replace(/全巻/g,' ').replace(/[★☆【】\[\]()（）]/g,' ').replace(/\s+/g,' ').trim()}
+const rowWork=r=>String(imp&&imp.title||'').trim()||deriveWork(r.title);
+function volOf(title){const t=String(title||'').replace(/[０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-65248));
+ let m=t.match(/(\d+)\s*巻?\s*[〜~\-－ー‐]\s*(\d+)\s*巻/);if(m){const a=+m[1],b=+m[2];return{key:a+'〜'+b,vols:a+'〜'+b,setk:/全巻|完結/.test(t)?'全巻セット':'途中セット',label:a+'〜'+b+'巻セット'}}
+ if(/全巻/.test(t))return{key:'全巻',vols:'',setk:'全巻セット',label:'全巻セット'};
+ m=t.match(/第?\s*(\d+)\s*巻/);if(m)return{key:String(+m[1]),vols:String(+m[1]),setk:'単巻',label:(+m[1])+'巻'};
+ return null}
+const whKey=(title,g)=>String(title||'').replace(/\s+/g,'').toLowerCase()+'\u0001'+g.key;
+function whFind(title,g){return db.items.find(x=>x.st==='cand'&&!x.inSet&&baseName(x).replace(/\s+/g,'').toLowerCase()===String(title||'').replace(/\s+/g,'').toLowerCase()&&((g.setk==='単巻'&&String(x.vols||'')===g.vols)||(g.setk!=='単巻'&&x.setk===g.setk&&String(x.vols||'')===g.vols)))}
 function impParse(){
  const rows=parseCSV(imp.text);if(!rows.length){imp.err='CSVが空です。Geminiの結果を貼り付けてください。';return}
  let h=rows[0],idx={name:0,price:1,kind:2,cond:3},start=0,ncol=5;
- if(h.some(x=>/価格|販売状況|商品名/.test(x))){start=1;ncol=h.length;const f=re=>h.findIndex(x=>re.test(x));idx={name:f(/商品名|タイトル/),price:f(/価格|金額/),kind:f(/販売状況|状況/),cond:f(/状態/)};
+ if(h.some(x=>/価格|販売状況|商品名/.test(x))){start=1;ncol=h.length;const f=re=>h.findIndex(x=>re.test(x));idx={name:f(/商品名|タイトル/),price:f(/価格|金額/),kind:f(/販売状況|状況/),cond:f(/状態/),url:f(/URL|url|リンク/)};
   if(idx.price<0||idx.kind<0){imp.err='「価格」と「販売状況」の列が見つかりません。';return}}
  const g=(r,k)=>idx[k]>=0&&r[idx[k]]!=null?r[idx[k]]:'',svc=SVN[imp.c];
- const ex=new Set(qOf(cur).filter(x=>!x.void&&x.title).map(x=>[x.svc,x.kind,x.price,x.title].join('\u0001')));
+ const ex=new Set((imp.mode==='wh'?db.items.filter(x=>x.st==='cand'):[cur]).flatMap(it=>qOf(it).filter(x=>!x.void&&x.title).map(x=>[x.svc,x.kind,x.price,x.title].join('\u0001'))));
  imp.rows=rows.slice(start).map((r,n)=>{const p=N(g(r,'price')),k=kindOf(g(r,'kind')),iss=[];
   if(r.length>ncol)iss.push('列の数が多すぎます(価格にカンマが入っている可能性)');
   if(p==null||p<=0||!Number.isInteger(p))iss.push('価格が読めません');
   if(!k)iss.push('販売状況が「売り切れ」「出品中」のどちらでもありません');
-  const o={n:n+1,title:g(r,'name'),price:p==null?'':String(p),kind:k,cond:condOf(g(r,'cond')),iss};
+  const o={url:/^https?:\/\//.test(g(r,'url'))?g(r,'url'):'',n:n+1,title:g(r,'name'),price:p==null?'':String(p),kind:k,cond:condOf(g(r,'cond')),iss};
   o.tags=[...new Set([...arr(imp.tags),...vdetect(o.title)])];o.auto=vdetect(o.title).filter(x=>!arr(imp.tags).includes(x));
-  o.dupe=!!o.title&&p!=null&&ex.has([svc,k,p,o.title].join('\u0001'));o.on=!iss.length&&!o.dupe;return o});
+  o.dupe=!!o.title&&p!=null&&ex.has([svc,k,p,o.title].join('\u0001'));
+  if(imp.mode==='wh'){o.g=volOf(o.title);o.work=rowWork(o);if(!o.g)iss.push('巻数が読み取れません(この行は記録しません)');else if(!o.work)iss.push('作品名が読み取れません')}
+  o.on=!iss.length&&!o.dupe;return o});
  imp.err=imp.rows.length?'':'データの行がありません。'}
 const impCnt=()=>imp&&imp.rows?imp.rows.filter(r=>r.on).length:0;
 function impRefresh(){if(view==='set'){const e=$('#impbox');if(e)e.innerHTML=impHtml()}else refresh(true)}
@@ -470,30 +521,40 @@ function impHtml(){
  if(!imp)return `<p class="mu">Geminiに画面録画を渡し、「商品名,価格,販売状況,商品の状態」の形のCSVにしてもらった結果を貼り付けます。</p><button style="width:100%;margin-bottom:10px" data-a="iopen">貼り付けを始める</button>`;
  const o=imp;
  if(!o.rows)return (db.meta.changes>0?`<div class="wn mu">⚠ 前回のバックアップ後に変更があります。取り込む前に「設定」でバックアップすると安心です。</div>`:'')
+  +`<label>記録先</label><select data-imp="mode">${opts([['wh','「すべて」に巻ごとに振り分ける'],['item','1つの商品に記録する']],o.mode)}</select>`
+  +(o.mode==='wh'?`<label>作品名(空欄なら商品名から自動で読み取り)</label><input data-imp="title" value="${esc(o.title)}" placeholder="空欄でOK(複数の作品をまとめて取り込めます)"><div class="mu">商品名の「1巻」「1〜8巻」「全巻」などを読み取り、作品・巻ごとの商品にまとめて「すべて」(相場の倉庫)に入れます。同じ作品・巻の商品がすでにあれば、そこに追加します。</div>`:`<label>記録する商品</label><select id="impitem">${db.items.slice().sort((a,b)=>String(b.updated||'').localeCompare(String(a.updated||''))).map(x=>`<option value="${x.id}"${cur&&cur.id===x.id?' selected':''}>${esc((dispName(x)||'(商品名未入力)')+' / '+ST[x.st])}</option>`).join('')||'<option value="">商品がありません</option>'}</select>`)
   +`<label>この記録の付加価値(全行に付きます)</label><div id="itags">${impTagHtml()}</div><div class="mu">商品名に「初版」「帯」「特典」などがある行は、自動で付きます。</div>`
-  +`<label>CSVを貼り付け</label><textarea data-imp="text" rows="6" placeholder="商品名,価格,販売状況,商品の状態">${esc(o.text)}</textarea>`
+  +`<label>情報の出どころ</label><select data-imp="src">${opts([['Muse','Muse'],['Gemini','Gemini'],['画面録画','画面録画'],['自分で確認','自分で確認'],['その他','その他']],o.src)}</select>`
+  +`<label>CSVファイルを選ぶ(任意)</label><input type="file" id="impf" accept=".csv,.txt,text/csv,text/plain">`
+  +`<label>またはCSVを貼り付け</label><textarea data-imp="text" rows="6" placeholder="商品名,価格,販売状況,商品の状態">${esc(o.text)}</textarea>`
   +`<div class="g2"><div><label>販路</label><select data-imp="c">${opts(CK.map(c=>[c,CH[c]]),o.c)}</select></div><div><label>確認した日時</label><input data-imp="d" type="datetime-local" value="${esc(o.d)}"></div></div>`
   +(o.err?`<div class="ng" style="margin-top:8px">${esc(o.err)}</div>`:'')
   +`<div class="row" style="margin-bottom:12px"><button data-a="icancel">やめる</button><button class="p" data-a="iparse">確認へ →</button></div>`;
  const bad=o.rows.filter(r=>r.iss.length).length,dp=o.rows.filter(r=>r.dupe).length;
- return `<div>${esc(CH[o.c])} / ${o.rows.length}行 ${bad?`<span class="wn">要確認${bad}行</span> `:''}${dp?`<span class="wn">記録済みと同じ${dp}行</span>`:''}</div><p class="mu">AIの読み取りは間違えることがあります。録画と見比べて、記録しない行はチェックを外してください。</p>`
+ const gsum=o.mode==='wh'?(()=>{const m=new Map();o.rows.filter(r=>r.on&&r.g&&r.work).forEach(r=>{const k=whKey(r.work,r.g);if(!m.has(k))m.set(k,{g:r.g,w:r.work,n:0});m.get(k).n++});const ws=new Set([...m.values()].map(x=>x.w)).size;return [...m.values()].sort((a,b)=>a.w.localeCompare(b.w)||(parseInt(a.g.key)||999)-(parseInt(b.g.key)||999)).map(x=>`<span class="bd">${ws>1?esc(x.w)+' ':''}${esc(x.g.label)} ${x.n}件${whFind(x.w,x.g)?'':' 新規'}</span>`).join('')})():'';
+ return `${gsum?`<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">${gsum}</div>`:''}<div>${esc(CH[o.c])} / ${o.rows.length}行 ${bad?`<span class="wn">要確認${bad}行</span> `:''}${dp?`<span class="wn">記録済みと同じ${dp}行</span>`:''}</div><p class="mu">AIの読み取りは間違えることがあります。録画と見比べて、記録しない行はチェックを外してください。</p>`
   +o.rows.map((r,i)=>`<div class="kv" style="display:block${r.iss.length||r.dupe?';border-left:3px solid var(--wn);padding-left:8px':''}"><label style="display:flex;gap:10px;align-items:center;margin:0;color:var(--tx)"><input type="checkbox" data-ir="${i}" data-if="on" ${r.on?'checked':''} style="width:24px;min-height:24px;flex:0 0 24px"><span>${r.n}. ${esc(r.title||'(商品名なし)')}</span></label>`
    +`<div class="g2"><input data-ir="${i}" data-if="price" inputmode="numeric" value="${esc(r.price)}" placeholder="価格" aria-label="価格"><select data-ir="${i}" data-if="kind">${opts([['','販売状況?'],['sold','売り切れ'],['listing','出品中']],r.kind)}</select></div>`
-   +`<div class="mu">付加価値: ${esc(vkey(r.tags))}${r.auto&&r.auto.length?'(商品名から自動)':''} / 状態: ${esc(r.cond||'未選択')}${r.cond&&!CONDS.includes(r.cond)?' <span class="wn">(選択肢にない表記)</span>':''}</div>${r.iss.map(x=>`<div class="wn mu">⚠ ${esc(x)}</div>`).join('')}${r.dupe?'<div class="wn mu">⚠ 同じ記録がすでにあります</div>':''}</div>`).join('')
+   +`<div class="mu">${o.mode==='wh'&&r.g?'→ <b>'+esc((r.work||'')+' '+r.g.label)+'</b> / ':''}付加価値: ${esc(vkey(r.tags))}${r.auto&&r.auto.length?'(商品名から自動)':''} / 状態: ${esc(r.cond||'未選択')}${r.cond&&!CONDS.includes(r.cond)?' <span class="wn">(選択肢にない表記)</span>':''}</div>${r.iss.map(x=>`<div class="wn mu">⚠ ${esc(x)}</div>`).join('')}${r.dupe?'<div class="wn mu">⚠ 同じ記録がすでにあります</div>':''}</div>`).join('')
   +`<div class="row" style="margin-bottom:12px"><button data-a="iback">← 戻る</button><button class="p" data-a="icommit"><span id="icnt">${impCnt()}</span>件を記録</button></div>`}
 function impInput(t){if(!imp)return false;
- if(t.dataset.imp){imp[t.dataset.imp]=t.value;return true}
+ if(t.dataset.imp){imp[t.dataset.imp]=t.value;if(t.dataset.imp==='mode'&&t.tagName==='SELECT'){if(imp.mode==='item'&&!cur)cur=db.items[0]||null;impRefresh()}return true}
  if(t.dataset.ir!=null&&imp.rows){const r=imp.rows[+t.dataset.ir];if(r){if(t.dataset.if==='on')r.on=t.checked;else r[t.dataset.if]=t.value}const c=$('#icnt');if(c)c.textContent=impCnt();return true}
  return false}
 function impCommit(){
  if(!imp||!imp.rows)return;if(!imp.d)return alert('確認した日時を入力してください');
- const sel=imp.rows.filter(r=>r.on);if(!sel.length)return alert('記録する行がありません。');
+ const sel=imp.rows.filter(r=>r.on);if(!sel.length){const nd=imp.rows.filter(r=>r.dupe).length,nb=imp.rows.filter(r=>r.iss.length).length;return note('取り込み結果\n追加:0件\n重複でスキップ:'+nd+'件\n読み取れなかった行:'+nb+'件'+(nd?'\n(すべて記録済みの相場でした)':''))}
  const ng=sel.filter(r=>{const p=N(r.price);return p==null||p<=0||!Number.isInteger(p)||!r.kind});
  if(ng.length)return alert('価格と販売状況を確認してください: '+ng.map(r=>r.n+'行目').join('、'));
  const s=sel.filter(r=>r.kind==='sold').length;
  ask(sel.length+'件を'+CH[imp.c]+'の相場として記録します。\n売り切れ '+s+'件 / 出品中 '+(sel.length-s)+'件\n\n記録は削除できません(あとで「除外」はできます)。','記録する',()=>{
- const bid='b'+Date.now().toString(36),t=new Date().toISOString();
- cur.quotes=[...qOf(cur),...sel.map((r,i)=>({id:'q'+Date.now().toString(36)+i.toString(36)+Math.random().toString(36).slice(2,5),t,svc:SVN[imp.c],kind:r.kind,price:N(r.price),cond:r.cond,tags:arr(r.tags).slice(),set:'',d:imp.d,kw:'',src:imp.src,note:'',by:'CSV取り込み',title:r.title,imp:bid}))];
+ const bid='b'+Date.now().toString(36),t=new Date().toISOString(),mk=(r,i)=>({id:'q'+Date.now().toString(36)+i.toString(36)+Math.random().toString(36).slice(2,5),t,svc:SVN[imp.c],kind:r.kind,price:N(r.price),cond:r.cond,tags:arr(r.tags).slice(),set:'',d:imp.d,kw:'',src:r.url||imp.src,note:r.url?imp.src:'',by:'CSV取り込み',title:r.title,imp:bid});
+ if(imp.mode==='wh'){let made=0,used=new Set(),nadd=0;const nd=imp.rows.filter(r=>r.dupe).length,nbad=imp.rows.filter(r=>r.iss.length).length;
+  sel.forEach((r,i)=>{if(!r.g||!r.work)return;let it=whFind(r.work,r.g);nadd++;
+   if(!it){it={id:'i'+Date.now().toString(36)+i.toString(36),name:r.work,code:'',pub:'',author:'',setk:r.g.setk,vols:r.g.vols,cond:'',cost:'',ship:'',shipm:'',pack:'',other:'',store:'',date:'',st:'cand',tags:[],quotes:[],created:t,updated:t,src:'CSV取り込み'};db.items.push(it);made++}
+   it.quotes=[...qOf(it),mk(r,i)];it.updated=t;used.add(it.id)});
+  qc=imp.c;imp=null;save();lf='all';impRefresh();note('取り込み結果\n追加:'+nadd+'件(「すべて」の商品 '+used.size+'件・うち新規 '+made+'件)\n重複でスキップ:'+nd+'件\n読み取れなかった行:'+nbad+'件');return}
+ cur.quotes=[...qOf(cur),...sel.map((r,i)=>({id:'q'+Date.now().toString(36)+i.toString(36)+Math.random().toString(36).slice(2,5),t,svc:SVN[imp.c],kind:r.kind,price:N(r.price),cond:r.cond,tags:arr(r.tags).slice(),set:'',d:imp.d,kw:'',src:r.url||imp.src,note:r.url?imp.src:'',by:'CSV取り込み',title:r.title,imp:bid}))];
  qc=imp.c;imp=null;touch();impRefresh();note(sel.length+'件を記録しました')})}
 
 /* ===== 📋 一覧 ===== */
@@ -502,7 +563,7 @@ function vList(){
  const cnt=k=>db.items.filter(LG[k]).length;
  return `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h1 style="margin:4px 0">一覧</h1><div style="display:flex;gap:6px"><button data-a="lsel" style="flex:0 0 auto" class="${selMode?'on':''}">${selMode?'やめる':'☑ セットにまとめる'}</button>${selMode?'':'<button class="p" data-a="ladd" style="flex:0 0 auto">＋ 追加</button>'}</div></div>${selMode?`<div class="card" style="position:sticky;top:env(safe-area-inset-top,0px);z-index:5;margin-top:8px"><div><b id="selcnt">${selIds.size}</b>冊を選択中</div><div class="mu">まとめたい本をタップして選び、「セット本を作る」を押してください。</div><button class="p" style="width:100%;margin-top:8px" data-a="mkset">セット本を作る</button></div>`:''}<input id="lq" style="margin-top:8px" type="search" placeholder="商品名・JAN・仕入先で絞り込み" value="${esc(lq)}">`
  +`<div class="chips">${[['all','すべて'],['pre','出品前'],['listed','出品中'],['sold','取引完了']].map(([k,t])=>`<button data-a="lf" data-v="${k}" class="${lf===k?'on':''}">${t} ${cnt(k)}</button>`).join('')}</div>`
- +`<div class="chips">${[['new','新しい順'],['profit','利益額順'],['rate','利益率順']].map(([k,t])=>`<button data-a="ls" data-v="${k}" class="${ls===k?'on':''}">${t}</button>`).join('')}<button data-a="l30" class="${l30?'on':''}">利益率${db.set.trate}%以上</button></div><select id="ltag" aria-label="絞り込み" style="margin-bottom:8px"><option value="">絞り込み: すべて</option><optgroup label="出版社">${[...new Set(db.items.map(i=>i.pub).filter(Boolean))].sort().map(x=>`<option value="p:${esc(x)}"${ltag==='p:'+x?' selected':''}>${esc(x)}</option>`).join('')}</optgroup><optgroup label="セット区分">${SETK.map(x=>`<option value="s:${x}"${ltag==='s:'+x?' selected':''}>${x}</option>`).join('')}</optgroup><optgroup label="付加価値">${db.set.tagV.map(x=>`<option value="t:${esc(x)}"${ltag==='t:'+x?' selected':''}>${esc(x)}</option>`).join('')}</optgroup></select><div id="items">${listHtml()}</div>`}
+ +`<div class="chips">${[['new','新しい順'],['profit','利益額順'],['rate','利益率順'],['old','調査が古い順']].map(([k,t])=>`<button data-a="ls" data-v="${k}" class="${ls===k?'on':''}">${t}</button>`).join('')}<button data-a="l30" class="${l30?'on':''}">利益率${db.set.trate}%以上</button></div><select id="ltag" aria-label="絞り込み" style="margin-bottom:8px"><option value="">絞り込み: すべて</option><optgroup label="出版社">${[...new Set(db.items.map(i=>i.pub).filter(Boolean))].sort().map(x=>`<option value="p:${esc(x)}"${ltag==='p:'+x?' selected':''}>${esc(x)}</option>`).join('')}</optgroup><optgroup label="セット区分">${SETK.map(x=>`<option value="s:${x}"${ltag==='s:'+x?' selected':''}>${x}</option>`).join('')}</optgroup><optgroup label="付加価値">${db.set.tagV.map(x=>`<option value="t:${esc(x)}"${ltag==='t:'+x?' selected':''}>${esc(x)}</option>`).join('')}</optgroup></select><div id="items">${listHtml()}</div>`}
 function listHtml(){
  const k=lq.trim().toLowerCase(),kn=nc(lq);
  const one=ltag==='s:単巻',LS={pre:i=>i.st==='bought',listed:i=>i.st==='listed',sold:i=>i.st==='sold',all:i=>i.st==='cand'};
@@ -511,10 +572,10 @@ function listHtml(){
   const b=best(i);return{i,p:b&&b.profit!=null?b.profit:null,r:b&&b.profit!=null?b.rate:null}});
  const tot=a.length;if(l30)a=a.filter(x=>x.r!=null&&x.r>=db.set.trate);
  const nw=(x,y)=>String(y.i.updated||'').localeCompare(String(x.i.updated||''));
- if(ls==='new')a.sort(nw);else{const key=ls==='profit'?'p':'r',c=a.filter(x=>x[key]!=null).sort((x,y)=>y[key]-x[key]||nw(x,y)),u=a.filter(x=>x[key]==null).sort(nw);c.forEach((x,n)=>x.rank=n+1);a=[...c,...u]}
+ if(ls==='new')a.sort(nw);else if(ls==='old')a.sort((x,y)=>String(lastSurvey(x.i)||'').localeCompare(String(lastSurvey(y.i)||''))||nw(x,y));else{const key=ls==='profit'?'p':'r',c=a.filter(x=>x[key]!=null).sort((x,y)=>y[key]-x[key]||nw(x,y)),u=a.filter(x=>x[key]==null).sort(nw);c.forEach((x,n)=>x.rank=n+1);a=[...c,...u]}
  const un=a.filter(x=>x.p==null).length;
  if(!a.length)return `<div class="card mu">${l30&&tot?'利益率'+db.set.trate+'%以上の商品はありません(利益を計算できない商品は対象外です)。':db.items.length?'該当する商品がありません。':'まだ商品がありません。「調べる」から登録してください。'}</div>`;
- return (ls!=='new'&&un?`<div class="mu" style="margin-bottom:6px">利益を計算できない${un}件は、順位なしで最後に表示しています。</div>`:'')+a.map(x=>itemCard(x.i,x.rank)).join('')}
+ return ((ls==='profit'||ls==='rate')&&un?`<div class="mu" style="margin-bottom:6px">利益を計算できない${un}件は、順位なしで最後に表示しています。</div>`:'')+a.map(x=>itemCard(x.i,x.rank)).join('')}
 function selOk(i){return !i.inSet&&!arr(i.members).length&&i.st!=='sold'}
 
 /* ===== 📊 集計 ===== */
@@ -585,6 +646,8 @@ function vSum(){
   return `<div class="kv" style="display:block" data-a="open" data-id="${i.id}"><b>${dn(i)}</b> <span class="wn mu">${si.t}</span><div class="mu">${i.st==='listed'?`${esc(CH[i.lc]||'出品先未選択')} 出品価格 ${yen(lp)}`:'仕入 '+yen(N(i.cost))}${m&&m.n?` / 売り切れ中央値 ${yen(m.p)} ${trustB(m)}`:''}${gap!=null&&gap>0?`<br><span class="wn">出品価格が相場より${yen(gap)}高いです</span>`:''}${(()=>{const c=cutCh(i),a=floorPrice(i,c,db.set.trate),b=floorPrice(i,c,null);return a!=null||b!=null?`<br>値下げの目安: 利益率${db.set.trate}%なら${yen(a)}まで / 赤字ライン${yen(b)}`:''})()}</div></div>`}).join(''):'<span class="mu">該当なし</span>'}<p class="mu">出品中は「出品日」、未出品は「仕入日」から数えます。日数は「設定」で変えられます。</p></div>`;
  return `<h1>集計</h1>`+dashHtml()+stHtml+(!saveOK?`<div class="card ng">⚠ このブラウザでは保存できません。</div>`:'')
  +`<div class="card"><div class="kv"><span>在庫(仕入済み+出品中)</span><b>${stock.length}件</b></div><div class="kv"><span>在庫の仕入総額</span><b>${yen(stock.reduce((a,i)=>a+(N(i.cost)||0),0))}</b></div><div class="kv"><span>仕入候補</span><b>${it.filter(LG.cand).length}件</b></div></div>`
+ +(()=>{const a=poolItems().map(i=>({i,d:lastSurvey(i)})).filter(x=>x.d).sort((x,y)=>x.d.localeCompare(y.d)).slice(0,30);if(!a.length)return'';const ws=new Map();a.forEach(x=>{const w=baseName(x.i);if(!ws.has(w)||ws.get(w).d>x.d)ws.set(w,x)});
+  return `<h2>再調査リスト(相場の古い順)</h2><div class="card">${[...ws.values()].sort((x,y)=>x.d.localeCompare(y.d)).map(x=>{const g=dayAgo(x.d);return `<div class="kv"><span>${esc(baseName(x.i))}</span><span class="${g>db.set.stale?'wn':'mu'}">${x.d.slice(5).replace('-','/')}(${g}日前)</span></div>`}).join('')}<p class="mu">作品ごとに、いちばん古い調査日を表示しています。上から順にAIへ調べ直しを頼むと、相場を新しく保てます。「${db.set.stale}日」(売れ残りのお知らせの日数)を超えたものは黄色です。</p></div>`})()
  +gt('付加価値別',grpTag())+gt('仕入先別',grp('store'))
  +`<h2>売れやすい候補・在庫</h2><div class="card">${fast.length?fast.slice(0,10).map(i=>`<div class="kv" data-a="open" data-id="${i.id}"><span>${dn(i)}</span><span class="mu">${ST[i.st]}</span></div>`).join(''):'<span class="mu">該当なし(30日以内の相場記録が5件以上あり、売り切れが出品中の2倍以上の商品を表示します)</span>'}</div>`
  +`<h2>相場の変化(直近30日と、31〜120日前の比較)</h2><div class="card">${tr.length?tr.slice(0,10).map(x=>`<div class="kv" data-a="open" data-id="${x.i.id}"><span>${dn(x.i)}<br><span class="mu">${CH[x.c]} ${yen(x.b)} → ${yen(x.a)}</span></span><b class="${x.ch>0?'ok':'ng'}">${x.ch>0?'↑':'↓'}${Math.abs(Math.round(x.ch))}%</b></div>`).join(''):'<span class="mu">該当なし(両方の期間に売り切れ記録が2件以上あり、10%以上変化した商品を表示します)</span>'}<p class="mu">あなたが記録した相場から計算しています。記録していない商品や、ジャンル全体の流行は分かりません。</p></div>`
@@ -603,7 +666,8 @@ function vSet(){
  +`<h2>売れ残りのお知らせ</h2><div class="card"><div class="g2">${f('stale','何日たったら知らせるか')}<div></div></div></div>`
  +`<button class="p" style="width:100%" data-a="sset">設定を保存</button>`
  +`<details class="card" id="shbox"${shOpen?' open':''} style="margin-top:18px"><summary>配送方法と送料(販路ごと)・${s.ships.length}件</summary>${s.ships.map((x,n)=>`<div style="border-bottom:1px dashed var(--bd);padding-bottom:10px;margin-bottom:6px"><div class="row" style="align-items:end"><div><label>配送方法</label><input data-sh="n" data-i="${n}" value="${esc(x.n)}" placeholder="例: ネコポス"></div><button class="d" data-a="shdel" data-i="${n}" aria-label="削除" style="flex:0 0 52px">✕</button></div><div class="g2">${CK.map(c=>`<div><label>${CH[c]}(円)</label><input data-sh="${c}" data-i="${n}" inputmode="numeric" value="${esc(x.p?x.p[c]:'')}" placeholder="未設定"></div>`).join('')}</div></div>`).join('')||'<div class="mu">まだ登録がありません。</div>'}<button style="width:100%;margin-top:10px" data-a="shadd">＋ 配送方法を追加</button><p class="mu">ここは入力するとすぐ保存されます。最初に入っている送料は、メルカリ・Yahoo!フリマ・楽天ラクマの2026年の公式料金表の値です(専用BOXなどの資材代は含みません。梱包費に入れてください)。ヤフオクは空欄なので、使う場合は公式の料金を確認して入れてください。料金が改定されたら、ここを直してください。</p></details>`
- +`<details class="card"${imp?' open':''} style="margin-top:18px"><summary>📥 Geminiの結果でまとめて記録</summary><label>記録する商品</label><select id="impitem">${db.items.length?db.items.slice().sort((a,b)=>String(b.updated||'').localeCompare(String(a.updated||''))).map(x=>`<option value="${x.id}"${cur&&cur.id===x.id?' selected':''}>${esc((x.name||'(商品名未入力)')+' / '+ST[x.st])}</option>`).join(''):'<option value="">商品がありません</option>'}</select><div id="impbox" style="margin-top:8px">${db.items.length?impHtml():''}</div></details>`
+ +`<details class="card"${imp?' open':''} style="margin-top:18px"><summary>📥 AIの結果でまとめて記録</summary><div id="impbox" style="margin-top:8px">${impHtml()}</div></details>`
+ +poolHtml()
  +`<details class="card"><summary>🧮 仕入値の電卓</summary><div id="calbox-set">${calHtml('set')}</div></details>`
  +`<h2>データの保存とバックアップ</h2><div class="card"><p class="mu">データはこのiPhoneのSafari内にだけ保存され、外部には送信されません。Safariのデータ削除などで消えることがあるため、定期的にバックアップしてください。</p><details><summary>機種変更のとき</summary><ol class="mu" style="padding-left:18px;margin:0 0 8px"><li>古いiPhoneで「バックアップ(復元用)を保存」を押し、保存先に「iCloud Drive」を選ぶ</li><li>新しいiPhoneで同じアドレスのSedoScopeを開き、ホーム画面に追加</li><li>「バックアップから復元」で、iCloud Driveに保存したファイルを選ぶ</li></ol><p class="mu">ホーム画面のアプリのデータは、iPhoneの引き継ぎで自動では移らないことがあります。必ずバックアップを使ってください。</p></details>`
  +`<div class="row"><button class="p" data-a="bak">バックアップ(復元用)を保存</button></div><div class="row"><button data-a="csv">商品CSV</button><button data-a="qcsv">相場CSV</button></div>`
@@ -624,6 +688,17 @@ function csv(){
  const H=['ID','表示タイトル','商品名','JAN/ISBN','出版社','著者','セット区分','巻','ジャンル','状態','ステータス','仕入先','仕入日','店頭・仕入価格','送料','梱包費','その他経費',...CK.flatMap(c=>[CH[c]+' 想定売価(手入力)',CH[c]+' 売り切れ中央値',CH[c]+' 信頼度',CH[c]+' 予想利益']),'出品先','出品価格','出品日','売れた販路','売れた価格','手数料','実送料','実梱包費','実その他','売れた日','実利益','メモ','登録日時','更新日時'];
  const rows=db.items.map(i=>[i.id,dispName(i),i.name,i.code,i.pub,i.author,i.setk,i.vols,i.genre,i.cond,ST[i.st],i.store,i.date,i.cost,i.ship,i.pack,i.other,...CK.flatMap(c=>{const m=mkt(i,c),r=calc(i,c);return[i['p'+c]||'',m.n?m.p:'',m.n?TL[m.t]:'',r.profit!=null?r.profit:'']}),CH[i.lc]||'',i.lp,i.ldate,CH[i.ac]||'',i.ap,i.afee,i.aship,i.apack,i.aother,i.adate,i.st==='sold'&&fin(i)!=null?fin(i):'',i.memo,i.created,i.updated].map(cell).join(','));
  dl('sedoscope_'+today()+'.csv','﻿'+[H.map(cell).join(','),...rows].join('\r\n'),'text/csv;charset=utf-8')}
+/* ===== 相場プール(=「すべて」の倉庫)の管理 ===== */
+const poolItems=()=>db.items.filter(i=>i.st==='cand'&&!i.inSet&&qOf(i).length);
+function poolHtml(){const ps=poolItems(),nq=ps.reduce((a,i)=>a+qOf(i).filter(q=>!q.void).length,0);
+ const works=new Map();ps.forEach(i=>{const w=baseName(i)||'(名前なし)';if(!works.has(w))works.set(w,[]);works.get(w).push(i)});
+ return `<details class="card"><summary>📚 相場プール(すべて)・${ps.length}商品/${nq}件</summary><p class="mu">「すべて」(倉庫)の商品にたまっている相場です。店頭チェックで照合に使います。</p>`
+ +([...works.entries()].sort((a,b)=>a[0].localeCompare(b[0])).map(([w,a])=>`<details style="border-bottom:1px dashed var(--bd)"><summary style="font-size:14px">${esc(w)}(${a.length}商品)</summary>${a.sort((x,y)=>(volCount(x)||0)-(volCount(y)||0)||String(x.vols).localeCompare(String(y.vols))).map(i=>{const m=mkt(i,'m'),ls=lastSurvey(i);return `<div class="kv"><span>${dn(i)}<br><span class="mu">メルカリ ${m.n?'中央値 '+yen(m.p)+'・'+m.n+'件':'売り切れなし'} / 最終 ${ls?ls.slice(5).replace('-','/'):'—'}</span></span><button class="d" data-a="pooldel" data-id="${i.id}" style="min-height:36px;padding:0 10px">削除</button></div>`}).join('')}<button class="d" style="width:100%;margin:6px 0 10px" data-a="poolwdel" data-v="${esc(w)}">「${esc(w)}」をまとめて削除</button></details>`).join('')||'<div class="mu">まだありません。「AIの結果でまとめて記録」で取り込むとここにたまります。</div>')
+ +`<div class="row"><button data-a="poolcsv">相場プールをCSVで出力</button></div><div class="row"><button class="d" data-a="poolall">相場プールを全削除</button></div><p class="mu">CSVは取り込みと同じ列(商品名,価格,販売状況,商品の状態,URL)なので、そのまま取り込み直せます。削除しても、出品前・出品中・取引完了の商品は消えません。</p></details>`}
+function poolCsv(){const H=['商品名','価格','販売状況','商品の状態','URL','販路','確認日時','出どころ'],rows=[];
+ poolItems().forEach(i=>qOf(i).filter(q=>!q.void).forEach(q=>{const vt=vlist(q.tags);rows.push([volName(i)+(i.setk&&i.setk!=='単巻'?' '+i.setk:'')+(vt.length?' '+vt.join(' '):''),q.price,KL[q.kind]||q.kind,q.cond||'',/^https?:/.test(q.src||'')?q.src:'',q.svc,fdt(q.d),/^https?:/.test(q.src||'')?(q.note||''):(q.src||'')].map(cell).join(','))}));
+ if(!rows.length)return note('相場プールにはまだ記録がありません');dl('sedoscope_pool_'+today()+'.csv','﻿'+[H.map(cell).join(','),...rows].join('\r\n'),'text/csv;charset=utf-8')}
+function poolDel(ids){const set=new Set(ids);db.items=db.items.filter(x=>!set.has(x.id));save();const sy=scrollY;render();scrollTo(0,sy);note(ids.length+'商品を相場プールから削除しました')}
 function qcsv(){
  const H=['商品ID','商品名','JAN/ISBN','サービス','種類','価格','商品状態','確認日時','出品タイトル','データ区分','除外','記録日時'];
  const rows=[];db.items.forEach(i=>qOf(i).forEach(q=>rows.push([i.id,i.name,i.code,q.svc,KL[q.kind]||q.kind,q.price,q.cond,fdt(q.d),q.title||'',q.by||'手入力',q.void?'除外':'',q.t].map(cell).join(','))));
@@ -662,9 +737,10 @@ const cam={stream:null,timer:null,mode:'res',busy:false,t0:0,tok:0,ct:null,lastB
 const ZXURL='https://cdn.jsdelivr.net/npm/@zxing/library@0.18.6/umd/index.min.js';
 const sUI=(m,c)=>{$('#sstat').className=c||'';$('#sstat').textContent=m};
 const setRun=b=>{$('#sretry').hidden=b;$('#sstop').hidden=!b};
-function stopCam(){cam.tok++;clearInterval(cam.timer);cam.timer=null;cam.busy=false;if(cam.stream){cam.stream.getTracks().forEach(t=>t.stop());cam.stream=null}$('#svid').srcObject=null;setRun(false)}
+function pauseCam(){cam.tok++;clearInterval(cam.timer);cam.timer=null;cam.busy=false;setRun(false)}
+function stopCam(){clearTimeout(cam.idle);cam.tok++;clearInterval(cam.timer);cam.timer=null;cam.busy=false;if(cam.stream){cam.stream.getTracks().forEach(t=>t.stop());cam.stream=null}$('#svid').srcObject=null;setRun(false)}
 function openScan(mode){clearTimeout(cam.ct);cam.mode=mode;cam.lastBad='';$('#scan').hidden=false;$('#mcode').value='';document.body.style.overflow='hidden';startCam()}
-function closeScan(){clearTimeout(cam.ct);stopCam();$('#scan').hidden=true;document.body.style.overflow=''}
+function closeScan(){clearTimeout(cam.ct);pauseCam();clearTimeout(cam.idle);cam.idle=setTimeout(stopCam,60000);/* 次の読み取りに備えて60秒だけカメラを保持 */$('#scan').hidden=true;document.body.style.overflow=''}
 const loadZX=()=>window.ZXing?Promise.resolve():new Promise((ok,ng)=>{const e=document.createElement('script');e.src=ZXURL;e.onload=ok;e.onerror=()=>ng(new Error('load'));document.head.appendChild(e)});
 async function mkDecoder(){
  if('BarcodeDetector' in window){try{const d=new BarcodeDetector({formats:['ean_13','ean_8','upc_a']});return async v=>{const r=await d.detect(v);return r.length?r[0].rawValue:null}}catch(e){}}
@@ -680,12 +756,12 @@ async function mkDecoder(){
   const sc=Math.min(1,(k%3?1280:960)/sw);cv.width=Math.round(sw*sc);cv.height=Math.round(sh*sc);cx.drawImage(v,sx,sy,sw,sh,0,0,cv.width,cv.height);
   return tryDec()}}
 async function startCam(){
- stopCam();const tok=cam.tok;sUI('カメラを起動しています…');
+ pauseCam();clearTimeout(cam.idle);const tok=cam.tok;sUI('カメラを起動しています…');const live=cam.stream&&cam.stream.getTracks().some(x=>x.readyState==='live');
  if(!window.isSecureContext||!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){sUI('この環境ではカメラを使えません(HTTPSで開いたSafariが必要です)。下の欄にコードを手入力してください。','ng');return}
- let st;try{st=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}},audio:false});try{const tr=st.getVideoTracks()[0],cp=tr.getCapabilities?tr.getCapabilities():{};if(cp.focusMode&&cp.focusMode.includes('continuous'))await tr.applyConstraints({advanced:[{focusMode:'continuous'}]})}catch(e){}}
+ let st;if(live)st=cam.stream;else try{st=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}},audio:false});try{const tr=st.getVideoTracks()[0],cp=tr.getCapabilities?tr.getCapabilities():{};if(cp.focusMode&&cp.focusMode.includes('continuous'))await tr.applyConstraints({advanced:[{focusMode:'continuous'}]})}catch(e){}}
  catch(e){if(tok!==cam.tok)return;const n=e&&e.name;sUI(n==='NotAllowedError'||n==='SecurityError'?'カメラの使用が許可されていません。Safariのアドレスバー左の「ぁあ」→「Webサイトの設定」→「カメラ」を「許可」にして、「カメラを起動」を押してください。':n==='NotFoundError'?'カメラが見つかりません。コードを手入力してください。':'カメラを起動できませんでした。「カメラを起動」で再試行するか、手入力してください。','ng');return}
- if(tok!==cam.tok){st.getTracks().forEach(t=>t.stop());return}
- cam.stream=st;const v=$('#svid');v.srcObject=st;try{await v.play()}catch(e){}
+ if(tok!==cam.tok){if(st!==cam.stream)st.getTracks().forEach(t=>t.stop());return}
+ cam.stream=st;const v=$('#svid');if(v.srcObject!==st)v.srcObject=st;try{await v.play()}catch(e){}
  const dec=await mkDecoder();if(tok!==cam.tok)return;
  if(!dec){stopCam();sUI('読み取り用の部品を読み込めませんでした(通信状況を確認)。「カメラを起動」で再試行するか、手入力してください。','ng');return}
  setRun(true);sUI('バーコードを枠に合わせてください(15〜20cmほど離すとピントが合いやすいです)','');cam.t0=Date.now();
@@ -694,7 +770,7 @@ async function startCam(){
   cam.busy=true;try{const x=await dec(v);if(x&&tok===cam.tok)onCode(x)}catch(e){}cam.busy=false},180)}
 function onCode(raw){const r=chkCode(raw);if(r.ok)return useCode(r.code);if(r.msg&&cam.lastBad!==raw){cam.lastBad=raw;sUI(r.msg,'wn')}}
 function useCode(code){
- stopCam();sUI('✓ 読み取り成功: '+code,'ok');
+ pauseCam();sUI('✓ 読み取り成功: '+code,'ok');
  cam.ct=setTimeout(()=>{closeScan();
   if(cam.mode==='item'&&view==='item'&&cur){const d=dup(code,cur.id);if(d){ask('このコードは「'+(d.name||'商品名なし')+'」として登録済みです。その商品を開きますか?','開く',()=>openItem(d.id));return}cur.code=code;cur.codeSrc='カメラ';touch();render()}
   else runRes(code)},600)}
@@ -717,9 +793,9 @@ document.addEventListener('click',e=>{
  else if(a==='ckstore'){ck.store=ck.store===v?'':v;document.querySelectorAll('[data-a=ckstore]').forEach(b=>b.classList.toggle('on',b.dataset.v===ck.store))}
  else if(a==='ckstock'){const x=db.items.find(i=>i.id===t.dataset.id);if(!x)return;const c=N(ck.cost);if(c==null||c<0)return alert('店頭価格を入れてください');
   const r=ckEval(x),wasCand=x.st==='cand';ckPush(x);const now=new Date().toISOString();let it=x;
-  if(x.st!=='cand'){it=JSON.parse(JSON.stringify(x));it.id='i'+Date.now().toString(36);it.created=now;['lc','lp','ldate','ac','ap','adate','afee','aship','apack','aother'].forEach(k=>it[k]='');delete it.calc;db.items.push(it)}
+  {it=JSON.parse(JSON.stringify(x));it.fromId=x.id;it.id='i'+Date.now().toString(36);it.created=now;['lc','lp','ldate','ac','ap','adate','afee','aship','apack','aother'].forEach(k=>it[k]='');delete it.calc;delete it.inSet;delete it.members;db.items.push(it)}
   it.cost=String(c);it.st='bought';it.date=today();if(ck.shipm){it.shipm=ck.shipm;it.ship=''}else if(N(ck.ship)!=null){it.ship=String(N(ck.ship));it.shipm=''}if(ck.store){it.store=ck.store;db.set.lastStore=ck.store}it.updated=now;save();
-  const e=$('#rres');if(e)e.innerHTML=resHtml();note('「'+(it.name||'商品')+'」を在庫に'+(wasCand?'移しました':'追加しました')+'。\n仕入 '+yen(c)+(r&&!r.err&&r.profit!=null?' / 予想利益 '+yen(r.profit)+'('+pct(r.rate)+')':''))}
+  const e=$('#rres');if(e)e.innerHTML=resHtml();note('「'+(it.name||'商品')+'」を在庫(出品前)に追加しました'+(wasCand?'(倉庫の情報は残っています)':'')+'。\n仕入 '+yen(c)+(r&&!r.err&&r.profit!=null?' / 予想利益 '+yen(r.profit)+'('+pct(r.rate)+')':''))}
  else if(a==='cknext'){if(rq.trim())ckPush(ckItem());rq='';ck=null;rob=null;rid++;render();openScan('res')}
  else if(a==='shp'){const n=t.dataset.n,tg=t.dataset.t;
   if(tg==='ck'){ck.shipm=n;const v=shipP(n,ck.c);ck.ship=v==null?ck.ship:String(v);const e=$('#rres');if(e)e.innerHTML=resHtml()}
@@ -735,9 +811,9 @@ document.addEventListener('click',e=>{
  else if(a==='st')setSt(v);
  else if(a==='qadd')qAdd();
  else if(a==='qvoid'){const q=qOf(cur).find(z=>z.id===t.dataset.id);if(q){const go2=()=>{q.void=!q.void;q.voidT=new Date().toISOString();touch();refresh(true);const d=document.querySelectorAll('#mkt details');d[d.length-1].open=true};if(!q.void)ask('この記録を誤入力として除外します。記録は残りますが、計算から外れます。','除外する',go2);else go2()}}
- else if(a==='iopen'){if(!cur)return;imp=impNew();impRefresh()}
+ else if(a==='iopen'){imp=impNew();impRefresh()}
  else if(a==='icancel'){const go2=()=>{imp=null;impRefresh()};if(imp&&imp.text.trim())ask('貼り付けた内容を破棄します。','破棄する',go2,true);else go2()}
- else if(a==='iparse'){if(imp&&cur){impParse();if(imp.err)imp.rows=null;impRefresh()}}
+ else if(a==='iparse'){if(imp&&(imp.mode==='wh'||cur)){impParse();if(imp.err)imp.rows=null;impRefresh()}}
  else if(a==='iback'){if(imp){imp.rows=null;impRefresh()}}
  else if(a==='icommit')impCommit();
  else if(a==='del'){const id=cur&&cur.id;ask('「'+(cur.name||'商品名なし')+'」を削除します。相場の記録も消え、元に戻せません。','削除する',()=>{db.items.forEach(x=>{if(x.inSet===id)delete x.inSet;if(Array.isArray(x.members))x.members=x.members.filter(m=>m!==id)});db.items=db.items.filter(x=>x.id!==id);save();cur=null;go(prev==='item'?'list':prev);note('削除しました')},true)}
@@ -765,6 +841,11 @@ document.addEventListener('click',e=>{
   const n=JSON.parse(JSON.stringify(x)),now=new Date().toISOString();n.id='i'+Date.now().toString(36);n.created=now;n.updated=now;n.st='bought';n.date=today();n.cost='';n.fromId=x.id;
   ['lc','lp','ldate','ac','ap','adate','afee','aship','apack','aother','inSet','members','calc'].forEach(k=>delete n[k]);db.items.push(n);save();openItem(n.id);note('出品前に複製しました。仕入価格は「価格・送料・仕入先・メモ」で入れてください。')})}
  else if(a==='tree'){/* 折りたたみの開閉だけ(商品は開かない) */}
+ else if(a==='cksel'){ckSel=t.dataset.id;ck=null;const e=$('#rres');if(e)e.innerHTML=resHtml()}
+ else if(a==='pooldel'){const x=byId(t.dataset.id);if(x)ask('「'+dispName(x)+'」を相場プール(すべて)から削除します。元に戻せません。','削除する',()=>poolDel([x.id]),true)}
+ else if(a==='poolwdel'){const w=v,ids=poolItems().filter(i=>(baseName(i)||'(名前なし)')===w).map(i=>i.id);ask('「'+w+'」の'+ids.length+'商品を相場プールから削除します。元に戻せません。','まとめて削除',()=>poolDel(ids),true)}
+ else if(a==='poolall'){const ids=poolItems().map(i=>i.id);if(!ids.length)return note('相場プールは空です');ask('相場プール(すべて)の'+ids.length+'商品を全部削除します。先にバックアップを保存しましたか?元に戻せません。','全削除',()=>poolDel(ids),true)}
+ else if(a==='poolcsv')poolCsv();
  else if(a==='summ'){if(v){sumM=v;const sy=scrollY;render();scrollTo(0,sy)}}
  else if(a==='ladd'){const st=lf==='pre'?'bought':lf==='listed'?'listed':lf==='sold'?'sold':'cand',ex={st};if(st!=='cand')ex.date=today();if(st==='listed'||st==='sold')ex.ldate=today();if(st==='sold')ex.adate=today();register('','',ex)}
  else if(a==='lf'){lf=v;render()}
@@ -788,6 +869,7 @@ document.addEventListener('input',e=>{const t=e.target;
  if(view==='item'&&t.id==='cuttry'){cutTry=t.value;const c=cutCh(cur),v=N(cutTry),r=$('#cutres');if(r)r.innerHTML=v!=null&&v>0&&db.set['r'+c]!=null&&N(cur.cost)!=null?cutRow(cur,c,v,'この価格で売れたら'):'';return}
  if(view==='item'&&t.dataset.f&&t.type!=='date'){const o=Object.assign({},cur,{[t.dataset.f]:t.value});const c=$('#calc');if(c)c.innerHTML=calcHtml(o);const f=$('#fin');if(f)f.innerHTML=finHtml(o)}});
 document.addEventListener('change',e=>{const t=e.target;
+ if(t.id==='impf'&&t.files&&t.files[0]&&imp){const r=new FileReader();r.onload=()=>{imp.text=String(r.result);impRefresh()};r.onerror=()=>note('ファイルを読み込めませんでした');r.readAsText(t.files[0]);return}
  if(t.id==='ltag'){ltag=t.value;const e2=$('#items');if(e2)e2.innerHTML=listHtml();return}
  if(t.id==='impitem'){cur=db.items.find(x=>x.id===t.value)||null;if(imp&&imp.rows)imp.rows=null;impRefresh();return}
  if((view==='item'||view==='set')&&impInput(t))return;
