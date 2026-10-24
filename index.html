@@ -186,9 +186,10 @@ tr.best{color:var(--ss)}
    データ: localStorage "sedoscope_s_v1"（SedoScope本体 "sedoscope_v1" とは別）
    外部通信: openBD ISBN照会のみ
    ============================================================ */
-const APP_VER='1.1.3';
+const APP_VER='1.2.0';
 const APP_DATE='2026-10-24';
 const CHANGELOG=[
+  'v1.2.0（2026-10-24）想定売価を最頻価格帯基準に変更（標準＝帯の平均、保守的＝帯の下限）。判定に使う相場を同じ商品名のグループに限定し、版違い・部分セットの混入を防止。',
   'v1.1.3（2026-10-24）タブ切替時のガタつき修正：ページ全体ではなく本文だけをスクロールする構造にし、iOS Safariのツールバー伸縮でタブバーや画面の高さが変わらないように',
   'v1.1.2（2026-10-24）警告バナーを下部（価格パッド／タブバーのすぐ上）に移動し、検索欄・絞り込み欄を塞がないように',
   'v1.1.1（2026-10-24）軽微修正：価格パッド開閉時に下余白を実測で追随／バックアップ警告バナーをヘッダー直下に重ねて表示し本文が動かないように',
@@ -320,11 +321,22 @@ function index(){
   return IDX={by,keyOf};
 }
 const itemKey=it=>index().keyOf.get(it)??workKey(it.work||it.name);
-function poolItemsFor(key){
-  if(!key)return [];const {by}=index();if(by.has(key))return by.get(key).slice();
-  if(key.length<3)return [];const out=[];
-  for(const [k,arr] of by){if(k.length>=3&&(k.includes(key)||key.includes(k)))out.push(...arr)}
+function poolItemsFor(key,broad){
+  if(!key)return [];const {by}=index();if(by.has(key)&&!broad)return by.get(key).slice();
+  const out=by.has(key)?by.get(key).slice():[];if(key.length<3)return out;
+  for(const [k,arr] of by){if(k!==key&&k.length>=3&&(k.includes(key)||key.includes(k)))out.push(...arr)}
   return out;
+}
+// 判定用：正規化名が完全一致する商品だけ（版違い・部分セットを混ぜない）
+const nname=s=>String(s??'').normalize('NFKC').trim();
+function exactItemsFor(it){const n=nname(it&&it.name);if(!n)return it?[it]:[];return S.items.filter(x=>nname(x.name)===n)}
+// 最頻価格帯：各価格pを起点に[p, p×1.25]に入る価格の集合で、件数最大（同数なら平均が全体の中央値に最も近い）の帯
+function modeBand(prices){
+  const a=[...prices].sort((x,y)=>x-y);if(!a.length)return null;const med=median(a);let best=null;
+  for(let i=0;i<a.length;i++){const lim=a[i]*1.25;let j=i;while(j+1<a.length&&a[j+1]<=lim)j++;
+    const b=a.slice(i,j+1),avg=b.reduce((x,y)=>x+y,0)/b.length;
+    if(!best||b.length>best.n||(b.length===best.n&&Math.abs(avg-med)<Math.abs(best.avg-med)))best={lo:b[0],hi:b[b.length-1],n:b.length,avg}}
+  return best;
 }
 const tnorm=t=>String(t||'').normalize('NFKC').toLowerCase().replace(/[\s・:：!！?？、。,.\-_~〜～\/／|｜+＋'"★☆【】\[\]()（）「」『』]+/g,'');
 function titleOk(q,key){return !q.title||!key||key.length<2||tnorm(q.title).includes(key)}
@@ -380,13 +392,19 @@ function analyze(ctx){
   const it=ctx.itemId?getItem(ctx.itemId):null;
   const title=ctx.title||(it&&it.name)||'';
   const key=it?itemKey(it):workKey(ctx.work||title);
-  let pool=poolItemsFor(key);if(it&&!pool.includes(it))pool.unshift(it);
-  const qs=poolQuotes(pool,key),st=qstats(qs),acc=accFactor(it);
+  let pool=poolItemsFor(key,true);if(it&&!pool.includes(it))pool.unshift(it);   // 欠巻・版違い用（作品単位）
+  let ex,prov=false;                                                              // 判定用（同じ商品名）
+  if(it)ex=exactItemsFor(it);
+  else{const n=nname(title);ex=n?S.items.filter(x=>nname(x.name)===n):[];if(!ex.length){ex=poolItemsFor(key);prov=ex.length>0}}
+  const qs=poolQuotes(ex,key),st=qstats(qs),acc=accFactor(it);
   const chs=[];
   for(const c of CH){const cs=set.ch[c];if(!cs.on)continue;let base=NaN,basis='';const man=it?num(it['p'+c]):NaN;
     if(man>0){base=man;basis='手入力の想定価格'}
     else{const own=qs.filter(q=>q.status==='sold'&&q.ch===c).map(q=>q.price);const arr=own.length?own:st.sp;
-      if(arr.length){base=set.mode==='cons'?Math.min(...arr):median(arr);basis=(set.mode==='cons'?'底値':'中央値')+'・'+(own.length?`${cs.name}の売り切れ${own.length}件`:`全販路の売り切れ${arr.length}件`)}
+      const src=own.length?cs.name:'全販路';
+      if(arr.length>=3){const bd=modeBand(arr);base=set.mode==='cons'?bd.lo:Math.floor(bd.avg/10)*10;
+        basis=`最頻価格帯の${set.mode==='cons'?'下限':'平均'}（帯 ${bd.lo.toLocaleString('ja-JP')}〜${bd.hi.toLocaleString('ja-JP')}円に${bd.n}件）・${src}の売り切れ${arr.length}件`}
+      else if(arr.length){base=set.mode==='cons'?Math.min(...arr):median(arr);basis=(set.mode==='cons'?'底値':'中央値')+'・'+`${src}の売り切れ${arr.length}件`}
       else if(it&&num(it.lo)>0){const lo=num(it.lo),hi=num(it.hi)>0?num(it.hi):lo;base=set.mode==='cons'?lo:Math.round((lo+hi)/2);basis='登録済みの想定価格（下限/上限）'}}
     if(!(base>0))continue;
     const sale=Math.round(base*acc.f),fee=Math.round(sale*(num(cs.fee)||0)/100);
@@ -404,10 +422,11 @@ function analyze(ctx){
     ed:editionNote(title,pool,it),
     dup:dupInfo(ctx.code||(it&&it.code),ctx.scan?null:(it&&it.id)),
     acc:acc.miss,
-    excluded:qs.excluded
+    excluded:qs.excluded,
+    prov
   };
   flags.missing=flags.vol&&flags.vol.missing.length?flags.vol.missing:[];
-  return{it,title,key,pool,qs,st,chs,best,flags};
+  return{it,title,key,pool,ex,qs,st,chs,best,flags};
 }
 function evalPrice(a,price){
   const b=a.best,r=num(S.settings.target)/100,f=a.flags;
@@ -530,6 +549,7 @@ function renderResult(){
   if(b&&f.few)chips.push(`<span class="chip info">売り切れ${a.st.soldN}件（件数少なめ）</span>`);
   if(f.missing.length)chips.push(`<span class="chip bad">欠巻 ${esc(compactVols(f.missing))}</span>`);
   if(f.ed.length)chips.push(`<span class="chip warn">版違い注意：${esc(f.ed.join('・'))}が同作品にあり</span>`);
+  if(f.prov&&b)chips.push(`<span class="chip warn">仮判定：同じ商品名の相場がないため同作品の相場を使用</span>`);
   if(f.excluded)chips.push(`<span class="chip info">作品名が合わない相場${f.excluded}件は除外</span>`);
   if(f.acc.length)chips.push(`<span class="chip info">付属品 ${esc(f.acc.join('・'))}</span>`);
   if(b&&b.basis.startsWith('手入力'))chips.push(`<span class="chip info">手入力の想定価格を使用</span>`);
@@ -545,18 +565,18 @@ function compactVols(a){const out=[];let s=a[0],p=a[0];for(let i=1;i<=a.length;i
 function detailHTML(a,ev,sc){
   const st=a.st,set=S.settings;let h='';
   if(a.chs.length){
-    h+=`<div class="sec">販路別（${set.mode==='cons'?'保守的＝底値':'標準＝中央値'}・目標利益率${esc(set.target)}%）</div><table><tr><th>販路</th><th>想定売価</th><th>手数料</th><th>送料+梱包+他</th><th>仕入上限</th>${isFinite(ev.price)?'<th>利益</th>':''}</tr>`+
+    h+=`<div class="sec">販路別（${set.mode==='cons'?'保守的＝最頻帯の下限':'標準＝最頻帯の平均'}・目標利益率${esc(set.target)}%）</div><table><tr><th>販路</th><th>想定売価</th><th>手数料</th><th>送料+梱包+他</th><th>仕入上限</th>${isFinite(ev.price)?'<th>利益</th>':''}</tr>`+
     a.chs.map(c=>`<tr${a.best===c?' class="best"':''}><td>${esc(c.name)}${a.best===c?' ★':''}</td><td class="num">${yenT(c.sale)}</td><td class="num">${yenT(c.fee)}</td><td class="num">${yenT(c.ship+c.pack+c.other)}</td><td class="num">${yenT(c.max)}</td>${isFinite(ev.price)?`<td class="num">${yenT(c.net-ev.price)}</td>`:''}</tr>`).join('')+`</table>`;
     h+=`<div class="note mt1">計算：仕入上限＝想定売価−手数料−送料−梱包費−その他−想定売価×目標利益率（10円単位切り捨て）。利益率＝利益÷想定売価。</div>`;
   }
-  h+=`<div class="sec">相場プール（作品キー「${esc(a.key||'—')}」・${a.pool.length}商品で共有）</div>
+  h+=`<div class="sec">相場（${a.flags.prov?'同じ商品名が未登録のため同作品の商品から仮集計':'同じ商品名で集計'}・売り切れ${st.soldN}件）</div>
   <table><tr><td>高値</td><td class="num">${yenT(st.hi)}</td><td>底値</td><td class="num">${yenT(st.lo)}</td></tr>
   <tr><td>中央値</td><td class="num">${yenT(st.med)}</td><td>出品中の最安</td><td class="num">${yenT(st.lisLo)}</td></tr>
   <tr><td>売り切れ</td><td class="num">${st.soldN}件</td><td>出品中</td><td class="num">${st.lisN}件</td></tr>
   <tr><td>最新売り切れ</td><td class="num" colspan="3">${st.latest?ymd(st.latest):'—'}</td></tr>
   <tr><td>販路ソース</td><td colspan="3" class="wrap">${esc(st.srcs.join('・')||'—')}</td></tr></table>`;
   const ck=Object.keys(st.cond);if(ck.length)h+=`<div class="sec">状態別（売り切れ）</div><table><tr><th>状態</th><th>件数</th><th>底値</th><th>中央値</th></tr>${ck.map(k=>{const v=st.cond[k];return`<tr><td>${esc(k)}</td><td class="num">${v.length}</td><td class="num">${yenT(Math.min(...v))}</td><td class="num">${yenT(median(v))}</td></tr>`}).join('')}</table>`;
-  if(a.pool.length)h+=`<div class="note mt2">共有元：${a.pool.slice(0,6).map(p=>`<a href="#" data-act="openItem" data-id="${esc(p.id)}">${esc(p.name||'(無題)')}</a>`).join('、')}${a.pool.length>6?' ほか':''}</div>`;
+  if(a.ex.length)h+=`<div class="note mt2">集計元：${a.ex.slice(0,6).map(p=>`<a href="#" data-act="openItem" data-id="${esc(p.id)}">${esc(p.name||'(無題)')}</a>`).join('、')}${a.ex.length>6?' ほか':''}</div>`;
   if(a.flags.vol){const v=a.flags.vol;h+=`<div class="sec">欠巻チェック</div><div class="note">${v.unknown?`巻範囲 ${v.need}巻分。「手元の巻」を入力するか単巻を登録すると判定します。`:v.missing.length?`欠け：${esc(compactVols(v.missing))}（${esc(v.src)}と照合）`:`欠巻なし（${esc(v.src)}と照合）`}</div>`}
   if(sc)h+=`<div class="sec">資金効率スコア <span class="num">${sc.v.toFixed(1)}</span></div><div class="note">予想利益 × 売れる確率 ÷（仕入総額 ${yenT(sc.total)} × 想定在庫日数）×100<br>${sc.why.map(esc).join('<br>')}</div>`;
   h+=`<div class="btns mt3">${a.it?`<button class="btn sm" data-act="openItem" data-id="${esc(a.it.id)}">商品を編集</button>`:''}<button class="btn sm" data-act="csvFor">この本に相場CSVを取り込む</button><button class="btn sm" data-act="quoteFor">相場を1件手入力</button></div>`;
@@ -784,7 +804,7 @@ function setHTML(){
   const inp=(path,val,attrs='')=>`<input data-set="${path}" value="${esc(val)}" ${attrs}>`;
   return `<div class="sec">判定</div><div class="card">
   <div class="grid2"><div class="fld"><label>目標利益率（%）</label>${inp('target',s.target,'inputmode="decimal"')}</div>
-  <div class="fld"><label>判定モード</label><select data-set="mode"><option value="cons"${s.mode==='cons'?' selected':''}>保守的（底値基準）</option><option value="std"${s.mode==='std'?' selected':''}>標準（中央値基準）</option></select></div>
+  <div class="fld"><label>判定モード</label><select data-set="mode"><option value="cons"${s.mode==='cons'?' selected':''}>保守的（最頻帯の下限）</option><option value="std"${s.mode==='std'?' selected':''}>標準（最頻帯の平均）</option></select></div>
   <div class="fld"><label>ばらつき警告（高値÷底値 倍）</label>${inp('disp',s.disp,'inputmode="decimal"')}</div>
   <div class="fld"><label>鮮度低下とみなす日数</label>${inp('fresh',s.fresh,'inputmode="numeric"')}</div>
   <div class="fld"><label>売却済みの重複警告（直近N日）</label>${inp('dupDays',s.dupDays,'inputmode="numeric"')}</div>
