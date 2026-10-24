@@ -13,10 +13,15 @@
   --ss:#2fd27a;--s:#5aa9ff;--w:#f5b83d;--x:#ff5d5d;
   --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
   --tabh:58px;--safe:env(safe-area-inset-bottom,0px);
+  --sp1:4px;--sp2:8px;--sp3:12px;--sp4:16px;
+  --r-lg:14px;--r-md:10px;--r-sm:8px;
+  --fs-sec:13px;--fs-body:15px;--fs-sub:12px;--fs-sheet:17px;
+  --h-btn:44px;--h-input:44px;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif}
 button,input,select,textarea{font:inherit;color:inherit}
+input,select,textarea{font-size:16px}
 button{touch-action:manipulation;cursor:pointer}
 a{color:var(--acc)}
 .num{font-family:var(--mono);font-variant-numeric:tabular-nums}
@@ -24,13 +29,14 @@ small.u{font-size:.6em;color:var(--mut);margin-left:2px}
 .mut{color:var(--mut)}
 header{position:sticky;top:0;z-index:20;background:rgba(15,17,21,.95);backdrop-filter:blur(8px);display:flex;align-items:center;gap:8px;padding:calc(env(safe-area-inset-top,0px) + 8px) 14px 8px;border-bottom:1px solid var(--line)}
 header h1{font-size:18px;margin:0;letter-spacing:.08em}
-header .ver{font-size:11px;color:var(--mut);background:none;border:1px solid var(--line);border-radius:10px;padding:1px 8px}
+header .ver{font-size:11px;color:var(--mut);background:none;border:1px solid var(--line);border-radius:var(--r-md);padding:1px 8px}
 header .store{margin-left:auto;font-size:12px;color:var(--mut);max-width:45%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#banner{position:fixed;left:12px;right:12px;bottom:calc(var(--tabh) + var(--safe) + var(--padh,0px) + var(--sp2));z-index:40}
 #banner:empty{display:none}
-.banner{margin:8px 12px 0;padding:10px 12px;border-radius:10px;background:#3a2a0b;border:1px solid #6b4d12;color:#ffd98a;font-size:13px;display:flex;gap:8px;align-items:center}
+.banner{margin:0;padding:10px 12px;border-radius:10px;background:#3a2a0b;border:1px solid #6b4d12;color:#ffd98a;font-size:13px;display:flex;gap:8px;align-items:center;box-shadow:0 6px 18px rgba(0,0,0,.45)}
 .banner button{margin-left:auto;background:#6b4d12;border:0;border-radius:8px;padding:6px 10px;color:#fff;white-space:nowrap}
-main{padding:10px 12px calc(var(--tabh) + var(--safe) + 16px)}
-main.withpad{padding-bottom:calc(var(--tabh) + var(--safe) + var(--padh,300px) + 12px)}
+main{padding:var(--sp3) var(--sp3) calc(var(--tabh) + var(--safe) + 16px + var(--sp2))}
+main.withpad{padding-bottom:calc(var(--tabh) + var(--safe) + var(--padh,300px) + 12px + var(--sp2))}
 nav#tabs{position:fixed;left:0;right:0;bottom:0;z-index:30;display:flex;background:#12151b;border-top:1px solid var(--line);padding-bottom:var(--safe);height:calc(var(--tabh) + var(--safe))}
 nav#tabs button{flex:1;background:none;border:0;color:var(--mut);font-size:11px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;position:relative}
 nav#tabs button .i{font-size:20px;line-height:1}
@@ -42,39 +48,39 @@ nav#tabs .badge{position:absolute;top:5px;right:22%;background:var(--x);color:#f
 .pricebar{display:flex;align-items:baseline;gap:6px;padding:0 4px 6px}
 .pricebar .lbl{font-size:12px;color:var(--mut)}
 .pricebar #pv{font-size:30px;font-weight:700;margin-left:auto}
-.pricebar .tg{align-self:center;background:var(--card2);border:1px solid var(--line);border-radius:8px;padding:4px 10px;font-size:12px;color:var(--mut)}
+.pricebar .tg{align-self:center;background:var(--card2);border:1px solid var(--line);border-radius:var(--r-sm);padding:4px 10px;font-size:12px;color:var(--mut)}
 .keys{display:grid;grid-template-columns:1fr 1fr 1fr 1.25fr;gap:6px}
-.keys button{height:44px;border-radius:10px;border:1px solid var(--line);background:var(--card);font-size:22px;font-family:var(--mono)}
+.keys button{height:var(--h-btn);border-radius:var(--r-md);border:1px solid var(--line);background:var(--card);font-size:22px;font-family:var(--mono)}
 .keys button:active{background:var(--card2)}
 .keys button.fn{font-size:16px;color:var(--mut)}
 .keys button.a{font-family:inherit;font-size:13px;font-weight:700;border:0;background:var(--card2)}
 .keys button.a.pri{background:var(--acc);color:#04203f}
 .keys button.a.scan-on{background:var(--x);color:#fff}
 .acts{display:grid;grid-template-columns:1.2fr 1fr 1fr 1fr;gap:6px}
-.acts button{height:44px;border-radius:10px;border:0;background:var(--card2);font-size:13px;font-weight:600}
-#res{min-height:calc(100vh - 120px)}
+.acts button{height:var(--h-btn);border-radius:var(--r-md);border:0;background:var(--card2);font-size:13px;font-weight:600}
+#res{min-height:calc(100dvh - 120px)}
 .acts button.pri{background:var(--acc);color:#04203f}
 .acts button.scan-on{background:var(--x);color:#fff}
-.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:10px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);padding:var(--sp3);margin-bottom:var(--sp2)}
 .row{display:flex;gap:8px;align-items:center}
-.srch{display:flex;gap:6px;margin-bottom:10px}
-.srch input{flex:1;min-width:0;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
-.btn{background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:9px 12px;font-size:14px}
+.srch{display:flex;gap:var(--sp2);margin-bottom:var(--sp2)}
+.srch input{flex:1;min-width:0;background:var(--card2);border:1px solid var(--line);border-radius:var(--r-md);height:var(--h-input);padding:0 var(--sp3)}
+.btn{background:var(--card2);border:1px solid var(--line);border-radius:var(--r-md);height:var(--h-btn);padding:0 var(--sp3);font-size:14px;display:inline-flex;align-items:center;justify-content:center}
 .btn.pri{background:var(--acc);border-color:var(--acc);color:#04203f;font-weight:700}
 .btn.dng{background:#3a1416;border-color:#6b2328;color:#ffb3b3}
-.btn.sm{padding:5px 9px;font-size:12px;border-radius:8px}
-.btns{display:flex;gap:6px;flex-wrap:wrap}
-#cam{position:relative;border-radius:14px;overflow:hidden;background:#000;margin-bottom:10px;height:170px}
+.btn.sm{height:32px;padding:0 var(--sp2);font-size:12px;border-radius:var(--r-sm)}
+.btns{display:flex;gap:var(--sp2);flex-wrap:wrap}
+#cam{position:relative;border-radius:var(--r-lg);overflow:hidden;background:#000;margin-bottom:var(--sp2);height:170px}
 #cam video{width:100%;height:100%;object-fit:cover;display:block}
 #cam .guide{position:absolute;left:8%;right:8%;top:50%;height:2px;background:rgba(255,80,80,.85);box-shadow:0 0 8px rgba(255,80,80,.9)}
 #cam .hint{position:absolute;left:0;right:0;bottom:6px;text-align:center;font-size:12px;color:#ddd;text-shadow:0 1px 2px #000}
 #cam.hit{outline:4px solid var(--ss);outline-offset:-4px}
 .bib{display:flex;gap:10px}
-.bib img{width:52px;height:74px;object-fit:cover;border-radius:4px;background:var(--card2);flex:none}
+.bib img{width:52px;height:74px;object-fit:cover;border-radius:var(--sp1);background:var(--card2);flex:none}
 .bib .t{font-weight:700;font-size:16px;line-height:1.35}
-.bib .s{font-size:12px;color:var(--mut)}
-.judge{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center;margin-top:10px}
-.sig{width:92px;height:92px;border-radius:18px;display:flex;flex-direction:column;align-items:center;justify-content:center;border:3px solid;font-weight:800}
+.bib .s{font-size:var(--fs-sub);color:var(--mut)}
+.judge{display:grid;grid-template-columns:auto 1fr;gap:var(--sp3);align-items:center;margin-top:var(--sp3)}
+.sig{width:92px;height:92px;border-radius:var(--r-lg);display:flex;flex-direction:column;align-items:center;justify-content:center;border:3px solid;font-weight:800}
 .sig .mk{font-size:46px;line-height:1}
 .sig .tx{font-size:14px;margin-top:2px}
 .sig.ss{color:var(--ss);border-color:var(--ss);background:rgba(47,210,122,.12)}
@@ -82,67 +88,73 @@ nav#tabs .badge{position:absolute;top:5px;right:22%;background:var(--x);color:#f
 .sig.w{color:var(--w);border-color:var(--w);background:rgba(245,184,61,.12);border-style:dashed}
 .sig.x{color:var(--x);border-color:var(--x);background:rgba(255,93,93,.12)}
 .sig.n{color:var(--mut);border-color:var(--line)}
-.kp label{display:block;font-size:12px;color:var(--mut)}
+.kp label{display:block;font-size:var(--fs-sub);color:var(--mut)}
 .kp .big{font-size:30px;font-weight:800;line-height:1.15}
 .kp .mid{font-size:22px;font-weight:700}
 .kp .pos{color:var(--ss)}.kp .neg{color:var(--x)}
-.basis{font-size:12px;color:var(--mut);margin-top:8px}
-.chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
-.chip{font-size:12px;border-radius:999px;padding:3px 9px;border:1px solid var(--line);background:var(--card2)}
+.basis{font-size:var(--fs-sub);color:var(--mut);margin-top:var(--sp2)}
+.chips{display:flex;flex-wrap:wrap;gap:var(--sp1);margin-top:var(--sp2)}
+.chip{font-size:var(--fs-sub);border-radius:999px;padding:var(--sp1) var(--sp2);border:1px solid var(--line);background:var(--card2)}
 .chip.warn{border-color:#7a5a17;background:#33270d;color:#ffd98a}
 .chip.bad{border-color:#7a2a2f;background:#331316;color:#ffb3b3}
 .chip.info{color:var(--mut)}
-.links{display:flex;gap:6px;overflow-x:auto;margin-top:10px;padding-bottom:2px}
-.links a{flex:none;text-decoration:none;font-size:12px;background:var(--card2);border:1px solid var(--line);color:var(--tx);border-radius:8px;padding:6px 9px}
-details.det{margin-top:10px}
-details.det summary{font-size:13px;color:var(--acc);cursor:pointer;list-style:none}
+.links{display:flex;gap:var(--sp2);overflow-x:auto;margin-top:var(--sp3);padding-bottom:2px}
+.links a{flex:none;text-decoration:none;font-size:12px;background:var(--card2);border:1px solid var(--line);color:var(--tx);border-radius:var(--r-sm);padding:var(--sp2) var(--sp3)}
+details.det{margin-top:var(--sp3)}
+details.det summary{font-size:var(--fs-sec);color:var(--acc);cursor:pointer;list-style:none}
 details.det summary::-webkit-details-marker{display:none}
-table{border-collapse:collapse;width:100%;font-size:12px}
-th,td{padding:5px 4px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+table{border-collapse:collapse;width:100%;font-size:var(--fs-sub)}
+th,td{padding:6px var(--sp1);border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
 th:first-child,td:first-child{text-align:left}
 th{color:var(--mut);font-weight:500}
-.sec{font-size:13px;color:var(--mut);margin:14px 2px 6px;font-weight:600}
-.list .it{display:flex;gap:10px;align-items:center;padding:10px;border-radius:12px;background:var(--card);border:1px solid var(--line);margin-bottom:8px}
-.list .it img,.list .it .ph{width:40px;height:56px;border-radius:4px;object-fit:cover;background:var(--card2);flex:none}
+tr.best{color:var(--ss)}
+.sec{font-size:var(--fs-sec);color:var(--mut);margin:var(--sp4) var(--sp1) var(--sp2);font-weight:600}
+.list .it{display:flex;gap:var(--sp3);align-items:center;padding:var(--sp3);border-radius:var(--r-lg);background:var(--card);border:1px solid var(--line);margin-bottom:var(--sp2)}
+.list .it img,.list .it .ph{width:40px;height:56px;border-radius:var(--sp1);object-fit:cover;background:var(--card2);flex:none}
 .list .it .m{flex:1;min-width:0}
 .list .it .t{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.list .it .s{font-size:12px;color:var(--mut)}
+.list .it .s{font-size:var(--fs-sub);color:var(--mut)}
 .list .it .r{text-align:right;flex:none}
-.st{font-size:11px;border-radius:6px;padding:1px 6px;border:1px solid var(--line);margin-right:4px}
+.st{font-size:11px;border-radius:var(--r-sm);padding:var(--sp1) var(--sp2);border:1px solid var(--line);margin-right:var(--sp1)}
 .st.cand{color:#c8b6ff;border-color:#4a3f75}.st.stock{color:#8fd3ff;border-color:#25506b}.st.listed{color:#ffd98a;border-color:#6b4d12}.st.sold{color:#9be7b6;border-color:#1f5a37}
-.minisig{display:inline-flex;width:30px;height:30px;border-radius:8px;border:2px solid;align-items:center;justify-content:center;font-weight:800}
+.minisig{display:inline-flex;width:30px;height:30px;border-radius:var(--r-sm);border:2px solid;align-items:center;justify-content:center;font-weight:800}
 .minisig.ss{color:var(--ss)}.minisig.s{color:var(--s)}.minisig.w{color:var(--w);border-style:dashed}.minisig.x{color:var(--x)}.minisig.n{color:var(--mut);border-color:var(--line)}
 .it.pick{border-color:var(--ss)!important;box-shadow:inset 0 0 0 1px var(--ss)}
-.fchips{display:flex;gap:6px;overflow-x:auto;margin-bottom:8px}
-.fchips button{flex:none;border:1px solid var(--line);background:var(--card);border-radius:999px;padding:5px 12px;font-size:13px;color:var(--mut)}
+.fchips{display:flex;gap:var(--sp2);overflow-x:auto;margin-bottom:var(--sp2)}
+.fchips button{flex:none;border:1px solid var(--line);background:var(--card);border-radius:var(--r-sm);height:32px;padding:0 var(--sp3);font-size:var(--fs-sec);color:var(--mut)}
 .fchips button.on{background:var(--acc);border-color:var(--acc);color:#04203f;font-weight:700}
-.kpis{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px}
-.kpi label{font-size:12px;color:var(--mut);display:block}
+.kpis{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp2)}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);padding:var(--sp3)}
+.kpi label{font-size:var(--fs-sub);color:var(--mut);display:block}
 .kpi b{font-size:22px}
-.fld{margin-bottom:10px}
-.fld label{display:block;font-size:12px;color:var(--mut);margin-bottom:3px}
-.fld input,.fld select,.fld textarea{width:100%;background:var(--card2);border:1px solid var(--line);border-radius:9px;padding:9px 10px}
-.fld textarea{min-height:70px}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 8px}
-.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0 6px}
-.tri{display:flex;flex-wrap:wrap;gap:6px}
-.tri button{border:1px solid var(--line);background:var(--card2);border-radius:9px;padding:6px 10px;font-size:13px}
+.fld{margin-bottom:var(--sp3)}
+.fld label{display:block;font-size:var(--fs-sub);color:var(--mut);margin-bottom:var(--sp1)}
+.fld input,.fld select,.fld textarea{width:100%;background:var(--card2);border:1px solid var(--line);border-radius:var(--r-md);height:var(--h-input);padding:0 var(--sp2);font-size:16px}
+.fld textarea{height:auto;min-height:70px;padding:var(--sp2)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 var(--sp2)}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0 var(--sp2)}
+.tri{display:flex;flex-wrap:wrap;gap:var(--sp2)}
+.tri button{border:1px solid var(--line);background:var(--card2);border-radius:var(--r-md);height:32px;padding:0 var(--sp3);font-size:var(--fs-sec)}
 .tri button.yes{border-color:var(--ss);color:var(--ss)}
 .tri button.no{border-color:var(--x);color:var(--x)}
 #sheet{position:fixed;inset:0;z-index:50;background:var(--bg);display:flex;flex-direction:column}
 #sheet[hidden]{display:none}
-#sheet .sh{display:flex;align-items:center;gap:8px;padding:calc(env(safe-area-inset-top,0px) + 10px) 12px 10px;border-bottom:1px solid var(--line)}
-#sheet .sh h2{font-size:16px;margin:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#sheet .sb{flex:1;overflow:auto;padding:12px 12px calc(30px + var(--safe))}
-#toast{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 56px);z-index:60;background:#2a3140;color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s;max-width:90%;text-align:center}
+#sheet .sh{display:flex;align-items:center;gap:var(--sp2);padding:calc(env(safe-area-inset-top,0px) + var(--sp3)) var(--sp3) var(--sp3);border-bottom:1px solid var(--line)}
+#sheet .sh h2{font-size:var(--fs-sheet);margin:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#sheet .sb{flex:1;overflow:auto;padding:var(--sp3) var(--sp3) calc(30px + var(--safe))}
+#toast{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 56px);z-index:60;background:#2a3140;color:#fff;padding:var(--sp3) var(--sp4);border-radius:var(--r-md);font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s;max-width:90%;text-align:center}
 #toast.on{opacity:1}
 .empty{text-align:center;color:var(--mut);padding:30px 10px}
-.qrow{display:grid;grid-template-columns:1fr auto;gap:2px 8px;font-size:12px;padding:6px 0;border-bottom:1px solid var(--line)}
+.qrow{display:grid;grid-template-columns:1fr auto;gap:2px var(--sp2);font-size:var(--fs-sub);padding:6px 0;border-bottom:1px solid var(--line)}
 .sum{font-size:13px;line-height:1.7}
 .sum b{font-family:var(--mono)}
-.inline-in{width:92px;background:var(--card2);border:1px solid var(--line);border-radius:8px;padding:6px 8px;text-align:right;font-family:var(--mono)}
-.note{font-size:12px;color:var(--mut)}
+.inline-in{width:92px;background:var(--card2);border:1px solid var(--line);border-radius:var(--r-md);height:36px;padding:0 var(--sp2);font-size:16px;text-align:right;font-family:var(--mono)}
+.note{font-size:var(--fs-sub);color:var(--mut)}
+.mt0{margin-top:0}.mt1{margin-top:var(--sp1)}.mt2{margin-top:var(--sp2)}.mt3{margin-top:var(--sp3)}.mb2{margin-bottom:var(--sp2)}.mb3{margin-bottom:var(--sp3)}
+.my3{margin:var(--sp3) var(--sp1)}.my4{margin:var(--sp4) 0}
+.fz-sec{font-size:var(--fs-sec)}.fz-body{font-size:var(--fs-body)}.lbl14{font-size:14px}
+.wrap{white-space:normal}.ff{font-family:inherit}.grow{flex:1;min-width:0}
+.ta-mono{min-height:110px;font-family:var(--mono)}
 </style>
 </head>
 <body>
@@ -151,7 +163,6 @@ th{color:var(--mut);font-weight:500}
   <button class="ver" data-act="showVer" id="ver"></button>
   <span class="store" id="hdStore"></span>
 </header>
-<div id="banner"></div>
 <main id="view"></main>
 <div id="pad" hidden></div>
 <nav id="tabs">
@@ -171,9 +182,12 @@ th{color:var(--mut);font-weight:500}
    データ: localStorage "sedoscope_s_v1"（SedoScope本体 "sedoscope_v1" とは別）
    外部通信: openBD ISBN照会のみ
    ============================================================ */
-const APP_VER='1.0.1';
+const APP_VER='1.1.2';
 const APP_DATE='2026-10-24';
 const CHANGELOG=[
+  'v1.1.2（2026-10-24）警告バナーを下部（価格パッド／タブバーのすぐ上）に移動し、検索欄・絞り込み欄を塞がないように',
+  'v1.1.1（2026-10-24）軽微修正：価格パッド開閉時に下余白を実測で追随／バックアップ警告バナーをヘッダー直下に重ねて表示し本文が動かないように',
+  'v1.1.0（2026-10-24）UI統一：余白・角丸・文字サイズをデザイントークンに統一／インライン余白をクラス化／タブごとのスクロール位置保持／入力欄16pxでiOSズーム防止／パッド開閉・バナー表示・スキャン時の画面の揺れを抑制',
   'v1.0.1（2026-10-24）SedoScope実データ対応：相場の販売状況(kind)・販路(svc)を読み取り／出品・売却の項目を対応付け／設定の引き継ぎ／セットの巻範囲を構成巻から自動設定／作品名が合わない相場を判定から除外',
   'v1.0.0（2026-10-24）初版：即時判定／相場プール（保守的・標準、ばらつき・二峰性・鮮度）／SedoScopeバックアップ取り込み／相場CSV取り込み／拡張リンクボタン／欠巻・版違い・付属品チェック／重複警告／カゴ（予算内の推奨）／資金効率スコア／集計／バックアップ警告'
 ];
@@ -428,27 +442,31 @@ async function fetchBiblio(isbn){
 /* ============================================================
    画面
    ============================================================ */
-const UI={tab:'look',listF:'all',listQ:'',listN:150,cartSort:'eff',per:'month',padOpen:true,search:null};
+const UI={scroll:{look:0,cart:0,list:0,stats:0,set:0},tab:'look',listF:'all',listQ:'',listN:150,cartSort:'eff',per:'month',padOpen:true,search:null};
 let CUR=null;   // 調べている本 {code,title,author,pub,cover,itemId,price,loading,netErr}
 
 function setTab(t){
   if(UI.tab==='look'&&t!=='look')stopScan();
+  if(UI.tab!==t)UI.scroll[UI.tab]=window.scrollY;
   UI.tab=t;document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));
-  render();window.scrollTo(0,0);
+  render();window.scrollTo({top:UI.scroll[t]||0,behavior:'auto'});
 }
 function render(){
   $('#ver').textContent='v'+APP_VER;$('#hdStore').textContent=S.settings.store?('🏬 '+S.settings.store):'';
-  renderBanner();renderBadge();
+  renderBadge();
   const v=$('#view');v.classList.toggle('withpad',UI.tab==='look');$('#pad').hidden=UI.tab!=='look';
-  if(UI.tab==='look'){v.innerHTML=lookHTML();renderPad();renderResult()}
-  else if(UI.tab==='cart')v.innerHTML=cartHTML();
-  else if(UI.tab==='list')v.innerHTML=listHTML();
-  else if(UI.tab==='stats')v.innerHTML=statsHTML();
-  else v.innerHTML=setHTML();
+  if(UI.tab!=='look'){const z=()=>{if(UI.tab!=='look')document.documentElement.style.setProperty('--padh','0px')};z();requestAnimationFrame(z)}
+  const bn='<div id="banner"></div>';
+  if(UI.tab==='look'){v.innerHTML=bn+lookHTML();renderPad();renderResult()}
+  else if(UI.tab==='cart')v.innerHTML=bn+cartHTML();
+  else if(UI.tab==='list')v.innerHTML=bn+listHTML();
+  else if(UI.tab==='stats')v.innerHTML=bn+statsHTML();
+  else v.innerHTML=bn+setHTML();
+  renderBanner();
 }
 function renderBadge(){const b=$('#qbadge');b.hidden=!S.queue.length;b.textContent=S.queue.length}
 function renderBanner(){
-  const lb=S.meta.lastBackup,el=$('#banner');let msg='';
+  const lb=S.meta.lastBackup,el=$('#banner');if(!el)return;let msg='';
   if(S.items.length){if(!lb)msg='まだバックアップを書き出していません。';else{const d=daysAgo(lb);if(d>num(S.settings.backupWarn))msg=`前回のバックアップから${d}日経過しています。`}}
   el.innerHTML=msg?`<div class="banner">⚠️ ${esc(msg)}<button data-act="doBackup">今すぐ書き出す</button></div>`:'';
 }
@@ -464,7 +482,7 @@ function renderPad(){
   ${UI.padOpen?`<div class="keys">${[[1,2,3],[4,5,6],[7,8,9],['C',0,'B']].map((r,i)=>r.map(k=>`<button ${k==='C'||k==='B'?'class="fn" ':''}data-act="key" data-k="${k}">${k==='B'?'⌫':k}</button>`).join('')+
     [`<button class="a ${Scan.on?'scan-on':'pri'}" data-act="scanToggle">${Scan.on?'■ 停止':'📷 スキャン'}</button>`,'<button class="a" data-act="toCart">カゴへ</button>','<button class="a" data-act="regStock">仕入れた</button>','<button class="a" data-act="regCand">候補保存</button>'][i]).join('')}</div>`
   :`<div class="acts"><button class="${Scan.on?'scan-on':'pri'}" data-act="scanToggle">${Scan.on?'■ 停止':'📷 スキャン'}</button><button data-act="toCart">カゴへ</button><button data-act="regStock">仕入れた</button><button data-act="regCand">候補保存</button></div>`}`;
-  document.documentElement.style.setProperty('--padh',p.offsetHeight+'px');
+  requestAnimationFrame(()=>{document.documentElement.style.setProperty('--padh', p.offsetHeight+'px')});
   updatePV();
 }
 function updatePV(){const e=$('#pv');if(e)e.textContent=CUR&&CUR.price!==''&&CUR.price!=null?Number(CUR.price).toLocaleString('ja-JP'):'—'}
@@ -474,23 +492,23 @@ function renderResult(){
   const a=analyze(CUR),ev=evalPrice(a,CUR.price),sc=effScore(a,ev),f=a.flags,b=a.best;
   const cover=CUR.cover||(a.it&&itemCover(a.it));
   const sub=[CUR.author,CUR.pub,CUR.code].filter(Boolean).map(esc).join('／');
-  let head=`<div class="bib">${cover?`<img src="${esc(cover)}" alt="" onerror="this.remove()">`:''}<div style="min-width:0;flex:1">
+  let head=`<div class="bib">${cover?`<img src="${esc(cover)}" alt="" onerror="this.remove()">`:''}<div class="grow">
     <div class="t">${CUR.title?esc(CUR.title):'<span class="mut">書名未取得</span>'}</div><div class="s">${sub}${CUR.loading?'　<span>書誌を取得中…</span>':''}</div>
     ${a.it?`<div class="s"><span class="st ${a.it.st}">${ST[a.it.st]||''}</span>登録済み</div>`:''}</div></div>`;
   if(!CUR.title&&!a.it){
-    head+=`<div class="fld" style="margin-top:8px"><label>${CUR.netErr?'書誌を取得できませんでした（電波なし等）。':CUR.noBib?'openBDに書誌がありません。':''}書名を入力すると相場プールと照合します</label>
+    head+=`<div class="fld mt2"><label>${CUR.netErr?'書誌を取得できませんでした（電波なし等）。':CUR.noBib?'openBDに書誌がありません。':''}書名を入力すると相場プールと照合します</label>
       <div class="row"><input id="manTitle" placeholder="例：ワンピース"><button class="btn" data-act="setManTitle">照合</button></div></div>`;
   }
   const sigK=ev.sig||(b?null:'n');
   let mid;
   if(!b){
-    mid=`<div class="judge"><div class="sig n"><div class="mk">—</div><div class="tx">相場なし</div></div><div class="kp"><div class="mut" style="font-size:13px">この作品の相場がまだありません。下のボタンで相場を確認し、相場CSVを取り込むと判定できます。</div></div></div>`;
+    mid=`<div class="judge"><div class="sig n"><div class="mk">—</div><div class="tx">相場なし</div></div><div class="kp"><div class="mut fz-sec">この作品の相場がまだありません。下のボタンで相場を確認し、相場CSVを取り込むと判定できます。</div></div></div>`;
   }else{
     const refNote=f.disp?'<div class="note">※ばらつき大のため参考値</div>':'';
     if(sigK){const [m,t]=SIG[sigK];
       mid=`<div class="judge"><div class="sig ${sigK}"><div class="mk">${m}</div><div class="tx">${t}</div></div>
       <div class="kp"><label>仕入上限</label><div class="big">${yen(b.max)}</div>
-      ${isFinite(ev.profit)?`<label>予想利益（利益率）</label><div class="mid ${ev.profit>0?'pos':'neg'}">${yen(ev.profit)} <span class="num" style="font-size:15px">${pct(ev.rate)}</span></div>`:'<div class="note">店頭価格を入力すると判定します</div>'}${refNote}</div></div>`;
+      ${isFinite(ev.profit)?`<label>予想利益（利益率）</label><div class="mid ${ev.profit>0?'pos':'neg'}">${yen(ev.profit)} <span class="num fz-body">${pct(ev.rate)}</span></div>`:'<div class="note">店頭価格を入力すると判定します</div>'}${refNote}</div></div>`;
     }else{
       mid=`<div class="judge"><div class="sig n"><div class="mk">¥</div><div class="tx">価格入力</div></div>
       <div class="kp"><label>仕入上限（目標${esc(S.settings.target)}%）</label><div class="big">${yen(b.max)}</div><div class="note">店頭価格を入力すると判定します</div>${refNote}</div></div>`;
@@ -513,26 +531,29 @@ function renderResult(){
   el.innerHTML=`<div class="card">${head}${mid}${basis}${chips.length?`<div class="chips">${chips.join('')}</div>`:''}${links}
     <details class="det"${UI.detOpen?' open':''} ontoggle="UI.detOpen=this.open"><summary>▼ 詳しい数値・根拠</summary>${detailHTML(a,ev,sc)}</details></div>`;
 }
-function focusRes(){requestAnimationFrame(()=>{const r=Scan.on?$('#camWrap'):$('#res');if(!r)return;const hd=$('header').offsetHeight;window.scrollTo({top:Math.max(0,r.getBoundingClientRect().top+window.scrollY-hd-6),behavior:'smooth'})})}
+function focusRes(){requestAnimationFrame(()=>{const r=Scan.on?$('#camWrap'):$('#res');if(!r)return;const hd=$('header').offsetHeight;const pad=$('#pad');
+  const bottom=pad&&!pad.hidden?pad.getBoundingClientRect().top:window.innerHeight;const top=r.getBoundingClientRect().top;
+  if(top>=hd&&top<=bottom-120)return;   // 見えていれば動かさない
+  window.scrollTo({top:Math.max(0,top+window.scrollY-hd-8),behavior:'auto'})})}
 function compactVols(a){const out=[];let s=a[0],p=a[0];for(let i=1;i<=a.length;i++){if(a[i]===p+1){p=a[i];continue}out.push(s===p?s:`${s}-${p}`);s=p=a[i]}return out.join(',')+'巻'}
 function detailHTML(a,ev,sc){
   const st=a.st,set=S.settings;let h='';
   if(a.chs.length){
     h+=`<div class="sec">販路別（${set.mode==='cons'?'保守的＝底値':'標準＝中央値'}・目標利益率${esc(set.target)}%）</div><table><tr><th>販路</th><th>想定売価</th><th>手数料</th><th>送料+梱包+他</th><th>仕入上限</th>${isFinite(ev.price)?'<th>利益</th>':''}</tr>`+
-    a.chs.map(c=>`<tr${a.best===c?' style="color:var(--ss)"':''}><td>${esc(c.name)}${a.best===c?' ★':''}</td><td class="num">${yenT(c.sale)}</td><td class="num">${yenT(c.fee)}</td><td class="num">${yenT(c.ship+c.pack+c.other)}</td><td class="num">${yenT(c.max)}</td>${isFinite(ev.price)?`<td class="num">${yenT(c.net-ev.price)}</td>`:''}</tr>`).join('')+`</table>`;
-    h+=`<div class="note" style="margin-top:4px">計算：仕入上限＝想定売価−手数料−送料−梱包費−その他−想定売価×目標利益率（10円単位切り捨て）。利益率＝利益÷想定売価。</div>`;
+    a.chs.map(c=>`<tr${a.best===c?' class="best"':''}><td>${esc(c.name)}${a.best===c?' ★':''}</td><td class="num">${yenT(c.sale)}</td><td class="num">${yenT(c.fee)}</td><td class="num">${yenT(c.ship+c.pack+c.other)}</td><td class="num">${yenT(c.max)}</td>${isFinite(ev.price)?`<td class="num">${yenT(c.net-ev.price)}</td>`:''}</tr>`).join('')+`</table>`;
+    h+=`<div class="note mt1">計算：仕入上限＝想定売価−手数料−送料−梱包費−その他−想定売価×目標利益率（10円単位切り捨て）。利益率＝利益÷想定売価。</div>`;
   }
   h+=`<div class="sec">相場プール（作品キー「${esc(a.key||'—')}」・${a.pool.length}商品で共有）</div>
   <table><tr><td>高値</td><td class="num">${yenT(st.hi)}</td><td>底値</td><td class="num">${yenT(st.lo)}</td></tr>
   <tr><td>中央値</td><td class="num">${yenT(st.med)}</td><td>出品中の最安</td><td class="num">${yenT(st.lisLo)}</td></tr>
   <tr><td>売り切れ</td><td class="num">${st.soldN}件</td><td>出品中</td><td class="num">${st.lisN}件</td></tr>
   <tr><td>最新売り切れ</td><td class="num" colspan="3">${st.latest?ymd(st.latest):'—'}</td></tr>
-  <tr><td>販路ソース</td><td colspan="3" style="white-space:normal">${esc(st.srcs.join('・')||'—')}</td></tr></table>`;
+  <tr><td>販路ソース</td><td colspan="3" class="wrap">${esc(st.srcs.join('・')||'—')}</td></tr></table>`;
   const ck=Object.keys(st.cond);if(ck.length)h+=`<div class="sec">状態別（売り切れ）</div><table><tr><th>状態</th><th>件数</th><th>底値</th><th>中央値</th></tr>${ck.map(k=>{const v=st.cond[k];return`<tr><td>${esc(k)}</td><td class="num">${v.length}</td><td class="num">${yenT(Math.min(...v))}</td><td class="num">${yenT(median(v))}</td></tr>`}).join('')}</table>`;
-  if(a.pool.length)h+=`<div class="note" style="margin-top:6px">共有元：${a.pool.slice(0,6).map(p=>`<a href="#" data-act="openItem" data-id="${esc(p.id)}">${esc(p.name||'(無題)')}</a>`).join('、')}${a.pool.length>6?' ほか':''}</div>`;
+  if(a.pool.length)h+=`<div class="note mt2">共有元：${a.pool.slice(0,6).map(p=>`<a href="#" data-act="openItem" data-id="${esc(p.id)}">${esc(p.name||'(無題)')}</a>`).join('、')}${a.pool.length>6?' ほか':''}</div>`;
   if(a.flags.vol){const v=a.flags.vol;h+=`<div class="sec">欠巻チェック</div><div class="note">${v.unknown?`巻範囲 ${v.need}巻分。「手元の巻」を入力するか単巻を登録すると判定します。`:v.missing.length?`欠け：${esc(compactVols(v.missing))}（${esc(v.src)}と照合）`:`欠巻なし（${esc(v.src)}と照合）`}</div>`}
   if(sc)h+=`<div class="sec">資金効率スコア <span class="num">${sc.v.toFixed(1)}</span></div><div class="note">予想利益 × 売れる確率 ÷（仕入総額 ${yenT(sc.total)} × 想定在庫日数）×100<br>${sc.why.map(esc).join('<br>')}</div>`;
-  h+=`<div class="btns" style="margin-top:10px">${a.it?`<button class="btn sm" data-act="openItem" data-id="${esc(a.it.id)}">商品を編集</button>`:''}<button class="btn sm" data-act="csvFor">この本に相場CSVを取り込む</button><button class="btn sm" data-act="quoteFor">相場を1件手入力</button></div>`;
+  h+=`<div class="btns mt3">${a.it?`<button class="btn sm" data-act="openItem" data-id="${esc(a.it.id)}">商品を編集</button>`:''}<button class="btn sm" data-act="csvFor">この本に相場CSVを取り込む</button><button class="btn sm" data-act="quoteFor">相場を1件手入力</button></div>`;
   return h;
 }
 function fillTpl(url,ctx){
@@ -565,10 +586,10 @@ function doSearch(){
   const nq=q.normalize('NFKC').toLowerCase(),wk=workKey(q);
   const hits=S.items.filter(it=>String(it.name||'').normalize('NFKC').toLowerCase().includes(nq)||(wk&&itemKey(it).includes(wk))).slice(0,30);
   const el=$('#srchRes');
-  el.innerHTML=`<div class="card"><div class="sec" style="margin-top:0">「${esc(q)}」の検索結果（端末内）</div>
+  el.innerHTML=`<div class="card"><div class="sec mt0">「${esc(q)}」の検索結果（端末内）</div>
     <div class="list">${hits.map(it=>`<div class="it" data-act="pickItem" data-id="${esc(it.id)}">${thumb(it)}<div class="m"><div class="t">${esc(it.name)}</div><div class="s"><span class="st ${it.st}">${ST[it.st]||''}</span>${esc(it.code||'')}　相場${(it.quotes||[]).length}件</div></div></div>`).join('')||'<div class="note">登録済みの商品には見つかりませんでした。</div>'}</div>
     <button class="btn" data-act="pickTitle" data-t="${esc(q)}">「${esc(q)}」として相場プールで仮判定</button>
-    <div class="note" style="margin-top:6px">※openBDはISBNでのみ照会できるため、タイトル検索は端末内データが対象です。</div></div>`;
+    <div class="note mt2">※openBDはISBNでのみ照会できるため、タイトル検索は端末内データが対象です。</div></div>`;
   $('#q').blur();
 }
 
@@ -597,17 +618,17 @@ function cartHTML(){
   rows.sort((x,y)=>sv(y)-sv(x));
   const {pick,sum,prof}=cartPicks(rows);
   const tot=rows.reduce((s,r)=>s+(r.ev.price>0?r.ev.price:0),0),tp=rows.reduce((s,r)=>s+(r.ev.profit>0?r.ev.profit:0),0);
-  return `<div class="card"><div class="row"><div style="flex:1"><div class="note">合計（価格入力済み）</div><div>${yen(tot)}／利益 ${yen(tp,'')}</div></div>
+  return `<div class="card sum"><div class="row"><div class="grow"><div class="note">合計（価格入力済み）</div><div>${yen(tot)}／利益 ${yen(tp,'')}</div></div>
     <div><div class="note">予算</div><input class="inline-in" inputmode="numeric" data-set="budget" value="${esc(S.settings.budget)}" placeholder="円"></div></div>
-    ${pick.size?`<div class="note" style="margin-top:6px">★ 予算内の推奨 ${pick.size}冊：仕入 ${yenT(sum)}／予想利益 ${yenT(prof)}（利益÷仕入額の高い順に選択）</div>`:''}</div>
+    ${pick.size?`<div class="note mt2">★ 予算内の推奨 ${pick.size}冊：仕入 ${yenT(sum)}／予想利益 ${yenT(prof)}（利益÷仕入額の高い順に選択）</div>`:''}</div>
   <div class="fchips">${[['eff','資金効率順'],['profit','利益額順'],['rate','利益率順'],['time','追加順']].map(([v,l])=>`<button class="${k===v?'on':''}" data-act="cartSort" data-v="${v}">${l}</button>`).join('')}</div>
   <div class="list">${rows.map(r=>{const s=r.ev.sig||(r.a.best?'n':'n');return`<div class="it ${pick.has(r.q.id)?'pick':''}">
     <span class="minisig ${s}">${SIG[s]?SIG[s][0]:'—'}</span>
     <div class="m" data-act="cartOpen" data-id="${esc(r.q.id)}"><div class="t">${pick.has(r.q.id)?'★ ':''}${esc(r.q.title||r.q.code||'(無題)')}</div>
     <div class="s">利益 ${yenT(r.ev.profit)}（${pct(r.ev.rate)}）・上限 ${yenT(r.a.best&&r.a.best.max)}・効率 ${r.sc?r.sc.v.toFixed(1):'—'}</div></div>
-    <div class="r"><input class="inline-in" inputmode="numeric" data-qprice="${esc(r.q.id)}" value="${esc(r.q.price)}" placeholder="価格"><br><button class="btn sm" data-act="qDel" data-id="${esc(r.q.id)}" style="margin-top:4px">見送り</button></div></div>`}).join('')}</div>
-  <div class="btns" style="margin-top:6px">${pick.size?`<button class="btn pri" data-act="buyPicks">★推奨${pick.size}冊を購入登録</button>`:''}<button class="btn" data-act="buyAll">全部を購入登録</button><button class="btn dng" data-act="qClear">全部見送り</button></div>
-  <div class="note" style="margin-top:8px">購入登録すると「仕入済」として一覧に入り、カゴから外れます。価格未入力の本は登録されません。</div>`;
+    <div class="r"><input class="inline-in" inputmode="numeric" data-qprice="${esc(r.q.id)}" value="${esc(r.q.price)}" placeholder="価格"><br><button class="btn sm" data-act="qDel" data-id="${esc(r.q.id)}" class="mt1">見送り</button></div></div>`}).join('')}</div>
+  <div class="btns mt2">${pick.size?`<button class="btn pri" data-act="buyPicks">★推奨${pick.size}冊を購入登録</button>`:''}<button class="btn" data-act="buyAll">全部を購入登録</button><button class="btn dng" data-act="qClear">全部見送り</button></div>
+  <div class="note mt2">購入登録すると「仕入済」として一覧に入り、カゴから外れます。価格未入力の本は登録されません。</div>`;
 }
 function buyRows(ids){
   let n=0,skip=0;const d=today();
@@ -645,7 +666,7 @@ function listHTML(){
   const shown=arr.slice(0,UI.listN);
   return `<div class="srch"><input id="lq" type="search" placeholder="タイトル・ISBN・タグ・店舗で絞り込み" value="${esc(UI.listQ)}"><button class="btn pri" data-act="newItem">＋新規</button></div>
   <div class="fchips">${[['all','全部'],['cand','候補'],['stock','仕入済'],['listed','出品中'],['sold','売却済'],['re','再調査']].map(([k,l])=>`<button class="${f===k?'on':''}" data-act="listF" data-v="${k}">${l}${k!=='re'?' '+cnt(k):''}</button>`).join('')}</div>
-  ${f==='re'?'<div class="note" style="margin-bottom:8px">最新の売り切れから'+esc(S.settings.fresh)+'日を超えた（または日付不明の）作品です。相場を取り直して取り込んでください。</div>':''}
+  ${f==='re'?'<div class="note mb2">最新の売り切れから'+esc(S.settings.fresh)+'日を超えた（または日付不明の）作品です。相場を取り直して取り込んでください。</div>':''}
   <div class="list">${shown.map(it=>{
     let right='';
     if(it.st==='sold'){const p=soldProfit(it);right=`<div class="note">確定利益</div><div class="num">${yenT(p)}</div>`}
@@ -695,7 +716,7 @@ function drawEditor(){
   // 付属品
   const acc=e.acc||{};
   h+=`<div class="sec">付属品チェック（タップで 未確認→あり→なし）</div><div class="tri">${ACC.map(([k,l])=>{const s=acc[k]||'';return`<button data-act="accTap" data-k="${k}" class="${s}">${s==='yes'?'✓':s==='no'?'✕':'・'} ${l}${s==='no'&&num(S.settings.acc[k])?` -${S.settings.acc[k]}%`:''}</button>`}).join('')}</div>
-  <div class="note" style="margin-top:4px">「なし」の項目は設定の割引率で想定売価を下げます。</div>`;
+  <div class="note mt1">「なし」の項目は設定の割引率で想定売価を下げます。</div>`;
   // 相場
   const qs=(e.quotes||[]).slice().reverse();
   h+=`<div class="sec">この商品の相場（${qs.length}件・作品単位で共有されます）</div>
@@ -704,10 +725,10 @@ function drawEditor(){
   <div class="fld"><label>販路</label><select id="nqC">${CH.map(c=>`<option value="${c}">${esc(S.settings.ch[c].name)}</option>`).join('')}</select></div></div>
   <div class="grid2"><div class="fld"><label>状態</label><input id="nqD" placeholder="目立った傷なし 等"></div><div class="fld"><label>確認日</label><input id="nqT" type="date" value="${today()}"></div></div>
   <div class="btns"><button class="btn" data-act="addQuote">相場を追加</button><button class="btn" data-act="csvForEdit">相場CSVを取り込む</button></div>
-  <div style="margin-top:8px">${qs.slice(0,80).map(q=>`<div class="qrow"><span>${q.status==='sold'?'売切':q.status==='listing'?'出品中':'不明'}・${esc(q.ch&&q.ch!=='o'?S.settings.ch[q.ch].name:q.src||'')}・${esc(q.cond||'')}<br><span class="mut">${esc(q.title||'')}</span></span><span class="num">${yenT(q.price)}<br><span class="mut">${esc(q.date||'')}</span></span></div>`).join('')}${qs.length>80?`<div class="note">ほか${qs.length-80}件</div>`:''}</div>`;
+  <div class="mt2">${qs.slice(0,80).map(q=>`<div class="qrow"><span>${q.status==='sold'?'売切':q.status==='listing'?'出品中':'不明'}・${esc(q.ch&&q.ch!=='o'?S.settings.ch[q.ch].name:q.src||'')}・${esc(q.cond||'')}<br><span class="mut">${esc(q.title||'')}</span></span><span class="num">${yenT(q.price)}<br><span class="mut">${esc(q.date||'')}</span></span></div>`).join('')}${qs.length>80?`<div class="note">ほか${qs.length-80}件</div>`:''}</div>`;
   const extra=Object.keys(e).filter(k=>!FIELDS.some(f=>f[0]===k)&&!['id','quotes','acc','created','_isNew','cover'].includes(k));
-  if(extra.length)h+=`<div class="note" style="margin-top:10px">その他の保存項目（表示のみ・そのまま保持）：${esc(extra.join(', '))}</div>`;
-  h+=`<div class="btns" style="margin:16px 0"><button class="btn pri" data-act="saveItem">保存</button><button class="btn" data-act="judgeItem">保存して判定を見る</button>${e._isNew?'':`<button class="btn dng" data-act="delItem">削除</button>`}</div>`;
+  if(extra.length)h+=`<div class="note mt3">その他の保存項目（表示のみ・そのまま保持）：${esc(extra.join(', '))}</div>`;
+  h+=`<div class="btns my4"><button class="btn pri" data-act="saveItem">保存</button><button class="btn" data-act="judgeItem">保存して判定を見る</button>${e._isNew?'':`<button class="btn dng" data-act="delItem">削除</button>`}</div>`;
   openSheet(e._isNew?'新規商品':(e.name||'商品'),h);
 }
 function readEditor(){
@@ -737,7 +758,7 @@ function statsHTML(){
   const stock=S.items.filter(i=>i.st==='stock'||i.st==='listed');const stockCost=stock.reduce((s,i)=>s+(num(i.cost)||0),0);
   const un=S.items.filter(i=>i.st==='listed'&&daysAgo(i.listDate||i.date)>num(S.settings.unsoldDays)).sort((a,b)=>daysAgo(b.listDate||b.date)-daysAgo(a.listDate||a.date));
   const re=recheckList();
-  const tbl=(m)=>{const ks=Object.keys(m).sort((a,b)=>m[b].p-m[a].p);return ks.length?`<table><tr><th></th><th>件数</th><th>利益</th><th>利益率</th></tr>${ks.map(k=>`<tr><td style="white-space:normal">${esc(k)}</td><td class="num">${m[k].n}</td><td class="num">${yenT(m[k].p)}</td><td class="num">${pct(m[k].p/m[k].s)}</td></tr>`).join('')}</table>`:'<div class="note">データなし</div>'};
+  const tbl=(m)=>{const ks=Object.keys(m).sort((a,b)=>m[b].p-m[a].p);return ks.length?`<table><tr><th></th><th>件数</th><th>利益</th><th>利益率</th></tr>${ks.map(k=>`<tr><td class="wrap">${esc(k)}</td><td class="num">${m[k].n}</td><td class="num">${yenT(m[k].p)}</td><td class="num">${pct(m[k].p/m[k].s)}</td></tr>`).join('')}</table>`:'<div class="note">データなし</div>'};
   return `<div class="fchips">${[['month','今月'],['last','先月'],['30','直近30日'],['year','今年'],['all','全期間']].map(([k,l])=>`<button class="${per===k?'on':''}" data-act="per" data-v="${k}">${l}</button>`).join('')}</div>
   <div class="kpis"><div class="kpi"><label>利益合計</label><b>${yen(prof)}</b></div><div class="kpi"><label>売上</label><b>${yen(sales)}</b></div>
   <div class="kpi"><label>売却数／平均利益率</label><b class="num">${cnt}</b> 件・<span class="num">${pct(sales?prof/sales:NaN)}</span></div>
@@ -765,25 +786,25 @@ function setHTML(){
   <div class="fld"><label>採用する販路</label><select data-set="pick"><option value="best"${s.pick==='best'?' selected':''}>最も上限が高い販路</option><option value="main"${s.pick==='main'?' selected':''}>主販路に固定</option></select></div>
   <div class="fld"><label>主販路</label><select data-set="main">${CH.map(c=>`<option value="${c}"${s.main===c?' selected':''}>${esc(s.ch[c].name)}</option>`).join('')}</select></div></div>
   <div class="fld"><label>今日の仕入店舗（購入登録時に記録）</label>${inp('store',s.store)}</div>
-  <label class="row" style="font-size:14px"><input type="checkbox" data-set="autoQueue" ${s.autoQueue?'checked':''}> スキャンするたびカゴへ自動追加</label>
-  <div class="note" style="margin-top:6px">判定基準：◎ 利益率が目標＋15ポイント以上かつ売り切れ3件以上（鮮度低下時は○）／○ 目標以上／△ 利益は出るが目標未満、またはばらつき大・価格帯混在・欠巻あり／✕ 利益が出ない。</div></div>
+  <label class="row lbl14"><input type="checkbox" data-set="autoQueue" ${s.autoQueue?'checked':''}> スキャンするたびカゴへ自動追加</label>
+  <div class="note mt2">判定基準：◎ 利益率が目標＋15ポイント以上かつ売り切れ3件以上（鮮度低下時は○）／○ 目標以上／△ 利益は出るが目標未満、またはばらつき大・価格帯混在・欠巻あり／✕ 利益が出ない。</div></div>
   <div class="sec">手数料・送料（初期値は目安です。ご自身の実績値に直してください）</div><div class="card">
   <table><tr><th>販路</th><th>使う</th><th>手数料%</th><th>送料円</th></tr>${CH.map(c=>`<tr><td>${esc(s.ch[c].name)}</td><td><input type="checkbox" data-set="ch.${c}.on" ${s.ch[c].on?'checked':''}></td><td><input class="inline-in" style="width:64px" inputmode="decimal" data-set="ch.${c}.fee" value="${esc(s.ch[c].fee)}"></td><td><input class="inline-in" style="width:72px" inputmode="numeric" data-set="ch.${c}.ship" value="${esc(s.ch[c].ship)}"></td></tr>`).join('')}</table>
-  <div class="grid2" style="margin-top:8px"><div class="fld"><label>梱包費（円）</label>${inp('pack',s.pack,'inputmode="numeric"')}</div><div class="fld"><label>その他費用・仕入送料（円）</label>${inp('other',s.other,'inputmode="numeric"')}</div></div></div>
+  <div class="grid2 mt2"><div class="fld"><label>梱包費（円）</label>${inp('pack',s.pack,'inputmode="numeric"')}</div><div class="fld"><label>その他費用・仕入送料（円）</label>${inp('other',s.other,'inputmode="numeric"')}</div></div></div>
   <div class="sec">付属品が「なし」のときの割引率（%）</div><div class="card"><div class="grid3">${ACC.map(([k,l])=>`<div class="fld"><label>${l}</label>${inp('acc.'+k,s.acc[k],'inputmode="numeric"')}</div>`).join('')}</div></div>
   <div class="sec">リンクボタン（{title} {isbn} {jan} {author} が置き換わります）</div><div class="card">
-  ${S.links.map((l,i)=>`<div class="fld"><div class="row"><input data-link="${i}" data-k="name" value="${esc(l.name)}" style="flex:1"><button class="btn sm" data-act="linkUp" data-i="${i}">↑</button><button class="btn sm dng" data-act="linkDel" data-i="${i}">削除</button></div><input data-link="${i}" data-k="url" value="${esc(l.url)}" style="margin-top:4px;font-size:12px"></div>`).join('')}
+  ${S.links.map((l,i)=>`<div class="fld"><div class="row"><input data-link="${i}" data-k="name" value="${esc(l.name)}" class="grow"><button class="btn sm" data-act="linkUp" data-i="${i}">↑</button><button class="btn sm dng" data-act="linkDel" data-i="${i}">削除</button></div><input data-link="${i}" data-k="url" value="${esc(l.url)}" class="mt1"></div>`).join('')}
   <div class="btns"><button class="btn" data-act="linkAdd">＋ボタンを追加</button><button class="btn" data-act="linkReset">初期のボタンに戻す</button></div>
-  <div class="note" style="margin-top:6px">リンクは外部サイトを開くだけで、データの自動取得はしません。</div></div>
+  <div class="note mt2">リンクは外部サイトを開くだけで、データの自動取得はしません。</div></div>
   <div class="sec">データ</div><div class="card sum">
   商品 <b>${S.items.length}</b> 件／相場 <b>${qn}</b> 件／カゴ <b>${S.queue.length}</b> 件<br>
   使用量 約 <b>${size>1048576?(size/1048576).toFixed(2)+' MB':(size/1024).toFixed(1)+' KB'}</b>（iPhoneのSafariは1サイトあたり約5MBが目安）<br>
   前回のバックアップ：<b>${S.meta.lastBackup?esc(String(S.meta.lastBackup).slice(0,16).replace('T',' ')):'なし'}</b><br>
   保存キー：<span class="num">${KEY}</span>（SedoScope本体のデータとは別）
-  <div class="btns" style="margin-top:10px"><button class="btn pri" data-act="doBackup">バックアップを書き出す</button><button class="btn" data-act="copyBackup">バックアップをコピー</button><button class="btn" data-act="restoreOpen">バックアップから復元</button></div>
-  <div class="btns" style="margin-top:8px"><button class="btn" data-act="sedoOpen">SedoScopeのデータを取り込む</button><button class="btn" data-act="csvOpen">相場CSVを取り込む</button></div>
-  <div class="btns" style="margin-top:8px"><button class="btn dng" data-act="wipe">すべてのデータを初期化</button></div></div>
-  <div class="note" style="margin:12px 2px">SSS v${APP_VER}（${APP_DATE}）／外部通信は openBD（ISBNの書誌照会）のみ。</div>`;
+  <div class="btns mt3"><button class="btn pri" data-act="doBackup">バックアップを書き出す</button><button class="btn" data-act="copyBackup">バックアップをコピー</button><button class="btn" data-act="restoreOpen">バックアップから復元</button></div>
+  <div class="btns mt2"><button class="btn" data-act="sedoOpen">SedoScopeのデータを取り込む</button><button class="btn" data-act="csvOpen">相場CSVを取り込む</button></div>
+  <div class="btns mt2"><button class="btn dng" data-act="wipe">すべてのデータを初期化</button></div></div>
+  <div class="note my3">SSS v${APP_VER}（${APP_DATE}）／外部通信は openBD（ISBNの書誌照会）のみ。</div>`;
 }
 
 /* ---------- バックアップ ---------- */
@@ -796,10 +817,10 @@ function doBackup(){
   toast('バックアップを書き出しました（「ファイル」アプリに保存されます）');render();
 }
 async function copyBackup(){try{S.meta.lastBackup=new Date().toISOString();await navigator.clipboard.writeText(backupJSON());save();toast('クリップボードにコピーしました。メモ等に貼り付けて保管してください');render()}catch(e){toast('コピーできませんでした')}}
-function fileOrTextHTML(id,accept,ph){return `<div class="fld"><label>ファイルを選ぶ</label><input type="file" id="${id}F" accept="${accept}"></div><div class="fld"><label>または中身を貼り付け</label><textarea id="${id}T" placeholder="${esc(ph)}" style="min-height:110px;font-family:var(--mono);font-size:12px"></textarea></div>`}
+function fileOrTextHTML(id,accept,ph){return `<div class="fld"><label>ファイルを選ぶ</label><input type="file" id="${id}F" accept="${accept}"></div><div class="fld"><label>または中身を貼り付け</label><textarea id="${id}T" placeholder="${esc(ph)}" class="ta-mono"></textarea></div>`}
 async function readFT(id){const f=$('#'+id+'F');if(f&&f.files&&f.files[0])return await f.files[0].text();return ($('#'+id+'T')||{}).value||''}
 function restoreOpen(){
-  openSheet('バックアップから復元',`<div class="banner" style="margin:0 0 10px">⚠️ 復元すると、いまのSSSのデータはすべて置き換わります（全置換）。先に今のデータを書き出しておくと安心です。</div>
+  openSheet('バックアップから復元',`<div class="banner mb3">⚠️ 復元すると、いまのSSSのデータはすべて置き換わります（全置換）。先に今のデータを書き出しておくと安心です。</div>
   ${fileOrTextHTML('rs','.json,application/json,text/plain','SSSのバックアップJSON')}<button class="btn pri" data-act="restoreRun">復元する</button>`);
 }
 async function restoreRun(){
@@ -834,11 +855,11 @@ function applySedoSet(set){
   return done;
 }
 function sedoOpen(){
-  openSheet('SedoScopeのデータを取り込む',`<div class="note" style="margin-bottom:8px">SedoScopeで書き出したバックアップJSON（items／set／meta を含むもの）を読み込み、SSSの形式に変換して取り込みます。SedoScope本体のデータは変更しません。</div>
+  openSheet('SedoScopeのデータを取り込む',`<div class="note mb2">SedoScopeで書き出したバックアップJSON（items／set／meta を含むもの）を読み込み、SSSの形式に変換して取り込みます。SedoScope本体のデータは変更しません。</div>
   ${fileOrTextHTML('sd','.json,application/json,text/plain','SedoScopeのバックアップJSON')}
   <div class="fld"><label>取り込み方法</label><select id="sdMode"><option value="merge">追加（マージ）：今のデータは消さない（おすすめ）</option><option value="replace">全置換：今のSSSのデータを消して入れ替える</option></select></div>
-  <label class="row" style="font-size:14px;margin-bottom:10px"><input type="checkbox" id="sdSet" checked> SedoScopeの設定（目標利益率・手数料・送料・梱包費）も引き継ぐ</label>
-  <button class="btn pri" data-act="sedoRun">取り込む</button><div id="sdSum" style="margin-top:12px"></div>`);
+  <label class="row lbl14 mb3"><input type="checkbox" id="sdSet" checked> SedoScopeの設定（目標利益率・手数料・送料・梱包費）も引き継ぐ</label>
+  <button class="btn pri" data-act="sedoRun">取り込む</button><div id="sdSum" class="mt3"></div>`);
 }
 function parseSedo(txt){
   let o=JSON.parse(txt);
@@ -877,7 +898,7 @@ function sedoSumHTML(s){
   const fc=SEDO_KNOWN.map(k=>`<tr><td>${k}</td><td class="num">${s.fieldCount[k]||0}</td></tr>`).join('');
   const uk=Object.keys(s.unknown).filter(k=>!SEDO_MAP[k]&&!SEDO_KEEP[k]);
   const mp=Object.keys(s.unknown).filter(k=>SEDO_MAP[k]),kp=Object.keys(s.unknown).filter(k=>SEDO_KEEP[k]);
-  return `<div class="card sum"><b style="font-family:inherit">取り込み結果</b><br>
+  return `<div class="card sum"><b class="ff">取り込み結果</b><br>
   元データの商品 <b>${s.src}</b> 件 → 変換 <b>${s.conv}</b> 件／追加 <b>${s.added}</b> 件${s.mode==='merge'?`／同じIDが既にあるためスキップ <b>${s.skipped}</b> 件`:'（全置換）'}<br>
   相場（quotes） <b>${s.qTotal}</b> 件を移行${s.qBad?`（うち価格または販売状況を読み取れないもの <b>${s.qBad}</b> 件：保持はしますが判定には使いません）`:''}<br>
   ${Object.keys(s.stMap).length?`ステータス変換：${Object.entries(s.stMap).map(([a,b])=>`${esc(a)}→${ST[b]}`).join('、')}（元の値は st_orig に保持）<br>`:''}
@@ -915,12 +936,12 @@ function importCSV(text,targetId,newName,src){
 }
 function csvOpen(targetId,defName){
   const opts=S.items.slice(0,400).map(i=>`<option value="${esc(i.id)}"${String(i.id)===String(targetId)?' selected':''}>${esc((i.name||'(無題)').slice(0,40))}${i.code?' ／'+esc(i.code):''}</option>`).join('');
-  openSheet('相場CSVを取り込む',`<div class="note" style="margin-bottom:8px">ヘッダ「商品名,価格,販売状況,商品の状態」のCSVを取り込みます。確認日は取り込んだ日として記録します。同じ内容（商品名・価格・販売状況・状態・販路が同じ）の行は重複として除外します。</div>
+  openSheet('相場CSVを取り込む',`<div class="note mb2">ヘッダ「商品名,価格,販売状況,商品の状態」のCSVを取り込みます。確認日は取り込んだ日として記録します。同じ内容（商品名・価格・販売状況・状態・販路が同じ）の行は重複として除外します。</div>
   <div class="fld"><label>取り込み先</label><select id="cvT"><option value="">＋新しい候補として作る</option>${opts}</select></div>
   <div class="fld"><label>新しく作る場合の商品名</label><input id="cvN" value="${esc(defName||'')}" placeholder="空欄ならCSVの1行目の商品名"></div>
   <div class="fld"><label>販路ソース</label><select id="cvS">${CH.map(c=>`<option value="${c}">${esc(S.settings.ch[c].name)}</option>`).join('')}</select></div>
   ${fileOrTextHTML('cv','.csv,text/csv,text/plain','商品名,価格,販売状況,商品の状態\n…')}
-  <button class="btn pri" data-act="csvRun">取り込む</button><div id="cvSum" style="margin-top:12px"></div>`);
+  <button class="btn pri" data-act="csvRun">取り込む</button><div id="cvSum" class="mt3"></div>`);
 }
 
 /* ============================================================
@@ -1058,7 +1079,7 @@ const ACT={
   csvOpen(){csvOpen(null,'')},
   async csvRun(){const txt=await readFT('cv');if(!txt.trim()){toast('CSVを選ぶか貼り付けてください');return}
     let r;try{r=importCSV(txt,$('#cvT').value,$('#cvN').value,$('#cvS').value)}catch(e){toast(e.message);return}
-    $('#cvSum').innerHTML=`<div class="card sum">取り込み先：<b style="font-family:inherit">${esc(r.it.name)}</b>${r.created?'（新規作成）':''}<br>読み込んだ行 <b>${r.total}</b>／追加 <b>${r.add}</b>／重複除外 <b>${r.dup}</b>／読めない行 <b>${r.bad}</b></div>`;
+    $('#cvSum').innerHTML=`<div class="card sum">取り込み先：<b class="ff">${esc(r.it.name)}</b>${r.created?'（新規作成）':''}<br>読み込んだ行 <b>${r.total}</b>／追加 <b>${r.add}</b>／重複除外 <b>${r.dup}</b>／読めない行 <b>${r.bad}</b></div>`;
     if(CUR&&!CUR.itemId&&r.created&&workKey(r.it.name)===workKey(CUR.title))CUR.itemId=null;
     toast(`${r.add}件を取り込みました`)}
 };
