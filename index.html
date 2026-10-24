@@ -20,6 +20,10 @@
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif}
+/* 画面の枠を固定し、スクロールは本文(main)の中だけで行う。
+   ページ全体がスクロールするとiOS Safariのツールバーが伸び縮みし、タブごとに画面の高さが変わってガタつくため */
+html{height:100%;overflow:hidden;overscroll-behavior:none}
+body{position:fixed;inset:0;display:flex;flex-direction:column;overflow:hidden}
 button,input,select,textarea{font:inherit;color:inherit}
 input,select,textarea{font-size:16px}
 button{touch-action:manipulation;cursor:pointer}
@@ -27,7 +31,7 @@ a{color:var(--acc)}
 .num{font-family:var(--mono);font-variant-numeric:tabular-nums}
 small.u{font-size:.6em;color:var(--mut);margin-left:2px}
 .mut{color:var(--mut)}
-header{position:sticky;top:0;z-index:20;background:rgba(15,17,21,.95);backdrop-filter:blur(8px);display:flex;align-items:center;gap:8px;padding:calc(env(safe-area-inset-top,0px) + 8px) 14px 8px;border-bottom:1px solid var(--line)}
+header{position:relative;flex:none;z-index:20;background:rgba(15,17,21,.95);backdrop-filter:blur(8px);display:flex;align-items:center;gap:8px;padding:calc(env(safe-area-inset-top,0px) + 8px) 14px 8px;border-bottom:1px solid var(--line)}
 header h1{font-size:18px;margin:0;letter-spacing:.08em}
 header .ver{font-size:11px;color:var(--mut);background:none;border:1px solid var(--line);border-radius:var(--r-md);padding:1px 8px}
 header .store{margin-left:auto;font-size:12px;color:var(--mut);max-width:45%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -35,7 +39,7 @@ header .store{margin-left:auto;font-size:12px;color:var(--mut);max-width:45%;ove
 #banner:empty{display:none}
 .banner{margin:0;padding:10px 12px;border-radius:10px;background:#3a2a0b;border:1px solid #6b4d12;color:#ffd98a;font-size:13px;display:flex;gap:8px;align-items:center;box-shadow:0 6px 18px rgba(0,0,0,.45)}
 .banner button{margin-left:auto;background:#6b4d12;border:0;border-radius:8px;padding:6px 10px;color:#fff;white-space:nowrap}
-main{padding:var(--sp3) var(--sp3) calc(var(--tabh) + var(--safe) + 16px + var(--sp2))}
+main{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:var(--sp3) var(--sp3) calc(var(--tabh) + var(--safe) + 16px + var(--sp2))}
 main.withpad{padding-bottom:calc(var(--tabh) + var(--safe) + var(--padh,300px) + 12px + var(--sp2))}
 nav#tabs{position:fixed;left:0;right:0;bottom:0;z-index:30;display:flex;background:#12151b;border-top:1px solid var(--line);padding-bottom:var(--safe);height:calc(var(--tabh) + var(--safe))}
 nav#tabs button{flex:1;background:none;border:0;color:var(--mut);font-size:11px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;position:relative}
@@ -182,9 +186,10 @@ tr.best{color:var(--ss)}
    データ: localStorage "sedoscope_s_v1"（SedoScope本体 "sedoscope_v1" とは別）
    外部通信: openBD ISBN照会のみ
    ============================================================ */
-const APP_VER='1.1.2';
+const APP_VER='1.1.3';
 const APP_DATE='2026-10-24';
 const CHANGELOG=[
+  'v1.1.3（2026-10-24）タブ切替時のガタつき修正：ページ全体ではなく本文だけをスクロールする構造にし、iOS Safariのツールバー伸縮でタブバーや画面の高さが変わらないように',
   'v1.1.2（2026-10-24）警告バナーを下部（価格パッド／タブバーのすぐ上）に移動し、検索欄・絞り込み欄を塞がないように',
   'v1.1.1（2026-10-24）軽微修正：価格パッド開閉時に下余白を実測で追随／バックアップ警告バナーをヘッダー直下に重ねて表示し本文が動かないように',
   'v1.1.0（2026-10-24）UI統一：余白・角丸・文字サイズをデザイントークンに統一／インライン余白をクラス化／タブごとのスクロール位置保持／入力欄16pxでiOSズーム防止／パッド開閉・バナー表示・スキャン時の画面の揺れを抑制',
@@ -447,9 +452,9 @@ let CUR=null;   // 調べている本 {code,title,author,pub,cover,itemId,price,
 
 function setTab(t){
   if(UI.tab==='look'&&t!=='look')stopScan();
-  if(UI.tab!==t)UI.scroll[UI.tab]=window.scrollY;
+  const mv=$('#view');if(UI.tab!==t)UI.scroll[UI.tab]=mv.scrollTop;
   UI.tab=t;document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));
-  render();window.scrollTo({top:UI.scroll[t]||0,behavior:'auto'});
+  render();mv.scrollTop=UI.scroll[t]||0;
 }
 function render(){
   $('#ver').textContent='v'+APP_VER;$('#hdStore').textContent=S.settings.store?('🏬 '+S.settings.store):'';
@@ -482,6 +487,7 @@ function renderPad(){
   ${UI.padOpen?`<div class="keys">${[[1,2,3],[4,5,6],[7,8,9],['C',0,'B']].map((r,i)=>r.map(k=>`<button ${k==='C'||k==='B'?'class="fn" ':''}data-act="key" data-k="${k}">${k==='B'?'⌫':k}</button>`).join('')+
     [`<button class="a ${Scan.on?'scan-on':'pri'}" data-act="scanToggle">${Scan.on?'■ 停止':'📷 スキャン'}</button>`,'<button class="a" data-act="toCart">カゴへ</button>','<button class="a" data-act="regStock">仕入れた</button>','<button class="a" data-act="regCand">候補保存</button>'][i]).join('')}</div>`
   :`<div class="acts"><button class="${Scan.on?'scan-on':'pri'}" data-act="scanToggle">${Scan.on?'■ 停止':'📷 スキャン'}</button><button data-act="toCart">カゴへ</button><button data-act="regStock">仕入れた</button><button data-act="regCand">候補保存</button></div>`}`;
+  document.documentElement.style.setProperty('--padh', p.offsetHeight+'px');
   requestAnimationFrame(()=>{document.documentElement.style.setProperty('--padh', p.offsetHeight+'px')});
   updatePV();
 }
@@ -534,7 +540,7 @@ function renderResult(){
 function focusRes(){requestAnimationFrame(()=>{const r=Scan.on?$('#camWrap'):$('#res');if(!r)return;const hd=$('header').offsetHeight;const pad=$('#pad');
   const bottom=pad&&!pad.hidden?pad.getBoundingClientRect().top:window.innerHeight;const top=r.getBoundingClientRect().top;
   if(top>=hd&&top<=bottom-120)return;   // 見えていれば動かさない
-  window.scrollTo({top:Math.max(0,top+window.scrollY-hd-8),behavior:'auto'})})}
+  const mv=$('#view');mv.scrollTop=Math.max(0,top-mv.getBoundingClientRect().top+mv.scrollTop-8)})}
 function compactVols(a){const out=[];let s=a[0],p=a[0];for(let i=1;i<=a.length;i++){if(a[i]===p+1){p=a[i];continue}out.push(s===p?s:`${s}-${p}`);s=p=a[i]}return out.join(',')+'巻'}
 function detailHTML(a,ev,sc){
   const st=a.st,set=S.settings;let h='';
