@@ -1,0 +1,1092 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f1115">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>SSS</title>
+<style>
+:root{
+  --bg:#0f1115;--card:#181b22;--card2:#1f232c;--line:#2b303b;--tx:#e9ecf2;--mut:#98a1b0;--acc:#5aa9ff;
+  --ss:#2fd27a;--s:#5aa9ff;--w:#f5b83d;--x:#ff5d5d;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --tabh:58px;--safe:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+button{touch-action:manipulation;cursor:pointer}
+a{color:var(--acc)}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+small.u{font-size:.6em;color:var(--mut);margin-left:2px}
+.mut{color:var(--mut)}
+header{position:sticky;top:0;z-index:20;background:rgba(15,17,21,.95);backdrop-filter:blur(8px);display:flex;align-items:center;gap:8px;padding:calc(env(safe-area-inset-top,0px) + 8px) 14px 8px;border-bottom:1px solid var(--line)}
+header h1{font-size:18px;margin:0;letter-spacing:.08em}
+header .ver{font-size:11px;color:var(--mut);background:none;border:1px solid var(--line);border-radius:10px;padding:1px 8px}
+header .store{margin-left:auto;font-size:12px;color:var(--mut);max-width:45%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#banner:empty{display:none}
+.banner{margin:8px 12px 0;padding:10px 12px;border-radius:10px;background:#3a2a0b;border:1px solid #6b4d12;color:#ffd98a;font-size:13px;display:flex;gap:8px;align-items:center}
+.banner button{margin-left:auto;background:#6b4d12;border:0;border-radius:8px;padding:6px 10px;color:#fff;white-space:nowrap}
+main{padding:10px 12px calc(var(--tabh) + var(--safe) + 16px)}
+main.withpad{padding-bottom:calc(var(--tabh) + var(--safe) + var(--padh,300px) + 12px)}
+nav#tabs{position:fixed;left:0;right:0;bottom:0;z-index:30;display:flex;background:#12151b;border-top:1px solid var(--line);padding-bottom:var(--safe);height:calc(var(--tabh) + var(--safe))}
+nav#tabs button{flex:1;background:none;border:0;color:var(--mut);font-size:11px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;position:relative}
+nav#tabs button .i{font-size:20px;line-height:1}
+nav#tabs button.on{color:var(--tx)}
+nav#tabs button.on::before{content:"";position:absolute;top:0;left:30%;right:30%;height:3px;border-radius:0 0 3px 3px;background:var(--acc)}
+nav#tabs .badge{position:absolute;top:5px;right:22%;background:var(--x);color:#fff;border-radius:9px;font-size:10px;min-width:17px;padding:0 4px;line-height:17px}
+#pad{position:fixed;left:0;right:0;bottom:calc(var(--tabh) + var(--safe));z-index:25;background:#12151b;border-top:1px solid var(--line);padding:8px 10px}
+#pad[hidden]{display:none}
+.pricebar{display:flex;align-items:baseline;gap:6px;padding:0 4px 6px}
+.pricebar .lbl{font-size:12px;color:var(--mut)}
+.pricebar #pv{font-size:30px;font-weight:700;margin-left:auto}
+.pricebar .tg{align-self:center;background:var(--card2);border:1px solid var(--line);border-radius:8px;padding:4px 10px;font-size:12px;color:var(--mut)}
+.keys{display:grid;grid-template-columns:1fr 1fr 1fr 1.25fr;gap:6px}
+.keys button{height:44px;border-radius:10px;border:1px solid var(--line);background:var(--card);font-size:22px;font-family:var(--mono)}
+.keys button:active{background:var(--card2)}
+.keys button.fn{font-size:16px;color:var(--mut)}
+.keys button.a{font-family:inherit;font-size:13px;font-weight:700;border:0;background:var(--card2)}
+.keys button.a.pri{background:var(--acc);color:#04203f}
+.keys button.a.scan-on{background:var(--x);color:#fff}
+.acts{display:grid;grid-template-columns:1.2fr 1fr 1fr 1fr;gap:6px}
+.acts button{height:44px;border-radius:10px;border:0;background:var(--card2);font-size:13px;font-weight:600}
+#res{min-height:calc(100vh - 120px)}
+.acts button.pri{background:var(--acc);color:#04203f}
+.acts button.scan-on{background:var(--x);color:#fff}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:10px}
+.row{display:flex;gap:8px;align-items:center}
+.srch{display:flex;gap:6px;margin-bottom:10px}
+.srch input{flex:1;min-width:0;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.btn{background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:9px 12px;font-size:14px}
+.btn.pri{background:var(--acc);border-color:var(--acc);color:#04203f;font-weight:700}
+.btn.dng{background:#3a1416;border-color:#6b2328;color:#ffb3b3}
+.btn.sm{padding:5px 9px;font-size:12px;border-radius:8px}
+.btns{display:flex;gap:6px;flex-wrap:wrap}
+#cam{position:relative;border-radius:14px;overflow:hidden;background:#000;margin-bottom:10px;height:170px}
+#cam video{width:100%;height:100%;object-fit:cover;display:block}
+#cam .guide{position:absolute;left:8%;right:8%;top:50%;height:2px;background:rgba(255,80,80,.85);box-shadow:0 0 8px rgba(255,80,80,.9)}
+#cam .hint{position:absolute;left:0;right:0;bottom:6px;text-align:center;font-size:12px;color:#ddd;text-shadow:0 1px 2px #000}
+#cam.hit{outline:4px solid var(--ss);outline-offset:-4px}
+.bib{display:flex;gap:10px}
+.bib img{width:52px;height:74px;object-fit:cover;border-radius:4px;background:var(--card2);flex:none}
+.bib .t{font-weight:700;font-size:16px;line-height:1.35}
+.bib .s{font-size:12px;color:var(--mut)}
+.judge{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center;margin-top:10px}
+.sig{width:92px;height:92px;border-radius:18px;display:flex;flex-direction:column;align-items:center;justify-content:center;border:3px solid;font-weight:800}
+.sig .mk{font-size:46px;line-height:1}
+.sig .tx{font-size:14px;margin-top:2px}
+.sig.ss{color:var(--ss);border-color:var(--ss);background:rgba(47,210,122,.12)}
+.sig.s{color:var(--s);border-color:var(--s);background:rgba(90,169,255,.12)}
+.sig.w{color:var(--w);border-color:var(--w);background:rgba(245,184,61,.12);border-style:dashed}
+.sig.x{color:var(--x);border-color:var(--x);background:rgba(255,93,93,.12)}
+.sig.n{color:var(--mut);border-color:var(--line)}
+.kp label{display:block;font-size:12px;color:var(--mut)}
+.kp .big{font-size:30px;font-weight:800;line-height:1.15}
+.kp .mid{font-size:22px;font-weight:700}
+.kp .pos{color:var(--ss)}.kp .neg{color:var(--x)}
+.basis{font-size:12px;color:var(--mut);margin-top:8px}
+.chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.chip{font-size:12px;border-radius:999px;padding:3px 9px;border:1px solid var(--line);background:var(--card2)}
+.chip.warn{border-color:#7a5a17;background:#33270d;color:#ffd98a}
+.chip.bad{border-color:#7a2a2f;background:#331316;color:#ffb3b3}
+.chip.info{color:var(--mut)}
+.links{display:flex;gap:6px;overflow-x:auto;margin-top:10px;padding-bottom:2px}
+.links a{flex:none;text-decoration:none;font-size:12px;background:var(--card2);border:1px solid var(--line);color:var(--tx);border-radius:8px;padding:6px 9px}
+details.det{margin-top:10px}
+details.det summary{font-size:13px;color:var(--acc);cursor:pointer;list-style:none}
+details.det summary::-webkit-details-marker{display:none}
+table{border-collapse:collapse;width:100%;font-size:12px}
+th,td{padding:5px 4px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--mut);font-weight:500}
+.sec{font-size:13px;color:var(--mut);margin:14px 2px 6px;font-weight:600}
+.list .it{display:flex;gap:10px;align-items:center;padding:10px;border-radius:12px;background:var(--card);border:1px solid var(--line);margin-bottom:8px}
+.list .it img,.list .it .ph{width:40px;height:56px;border-radius:4px;object-fit:cover;background:var(--card2);flex:none}
+.list .it .m{flex:1;min-width:0}
+.list .it .t{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.list .it .s{font-size:12px;color:var(--mut)}
+.list .it .r{text-align:right;flex:none}
+.st{font-size:11px;border-radius:6px;padding:1px 6px;border:1px solid var(--line);margin-right:4px}
+.st.cand{color:#c8b6ff;border-color:#4a3f75}.st.stock{color:#8fd3ff;border-color:#25506b}.st.listed{color:#ffd98a;border-color:#6b4d12}.st.sold{color:#9be7b6;border-color:#1f5a37}
+.minisig{display:inline-flex;width:30px;height:30px;border-radius:8px;border:2px solid;align-items:center;justify-content:center;font-weight:800}
+.minisig.ss{color:var(--ss)}.minisig.s{color:var(--s)}.minisig.w{color:var(--w);border-style:dashed}.minisig.x{color:var(--x)}.minisig.n{color:var(--mut);border-color:var(--line)}
+.it.pick{border-color:var(--ss)!important;box-shadow:inset 0 0 0 1px var(--ss)}
+.fchips{display:flex;gap:6px;overflow-x:auto;margin-bottom:8px}
+.fchips button{flex:none;border:1px solid var(--line);background:var(--card);border-radius:999px;padding:5px 12px;font-size:13px;color:var(--mut)}
+.fchips button.on{background:var(--acc);border-color:var(--acc);color:#04203f;font-weight:700}
+.kpis{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px}
+.kpi label{font-size:12px;color:var(--mut);display:block}
+.kpi b{font-size:22px}
+.fld{margin-bottom:10px}
+.fld label{display:block;font-size:12px;color:var(--mut);margin-bottom:3px}
+.fld input,.fld select,.fld textarea{width:100%;background:var(--card2);border:1px solid var(--line);border-radius:9px;padding:9px 10px}
+.fld textarea{min-height:70px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 8px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0 6px}
+.tri{display:flex;flex-wrap:wrap;gap:6px}
+.tri button{border:1px solid var(--line);background:var(--card2);border-radius:9px;padding:6px 10px;font-size:13px}
+.tri button.yes{border-color:var(--ss);color:var(--ss)}
+.tri button.no{border-color:var(--x);color:var(--x)}
+#sheet{position:fixed;inset:0;z-index:50;background:var(--bg);display:flex;flex-direction:column}
+#sheet[hidden]{display:none}
+#sheet .sh{display:flex;align-items:center;gap:8px;padding:calc(env(safe-area-inset-top,0px) + 10px) 12px 10px;border-bottom:1px solid var(--line)}
+#sheet .sh h2{font-size:16px;margin:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#sheet .sb{flex:1;overflow:auto;padding:12px 12px calc(30px + var(--safe))}
+#toast{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 56px);z-index:60;background:#2a3140;color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s;max-width:90%;text-align:center}
+#toast.on{opacity:1}
+.empty{text-align:center;color:var(--mut);padding:30px 10px}
+.qrow{display:grid;grid-template-columns:1fr auto;gap:2px 8px;font-size:12px;padding:6px 0;border-bottom:1px solid var(--line)}
+.sum{font-size:13px;line-height:1.7}
+.sum b{font-family:var(--mono)}
+.inline-in{width:92px;background:var(--card2);border:1px solid var(--line);border-radius:8px;padding:6px 8px;text-align:right;font-family:var(--mono)}
+.note{font-size:12px;color:var(--mut)}
+</style>
+</head>
+<body>
+<header>
+  <h1>SSS</h1>
+  <button class="ver" data-act="showVer" id="ver"></button>
+  <span class="store" id="hdStore"></span>
+</header>
+<div id="banner"></div>
+<main id="view"></main>
+<div id="pad" hidden></div>
+<nav id="tabs">
+  <button data-tab="look"><span class="i">🔍</span>調べる</button>
+  <button data-tab="cart"><span class="i">🧺</span>カゴ<span class="badge" id="qbadge" hidden></span></button>
+  <button data-tab="list"><span class="i">📚</span>一覧</button>
+  <button data-tab="stats"><span class="i">📊</span>集計</button>
+  <button data-tab="set"><span class="i">⚙️</span>設定</button>
+</nav>
+<div id="sheet" hidden><div class="sh"><h2 id="shT"></h2><button class="btn sm" data-act="closeSheet">閉じる</button></div><div class="sb" id="shB"></div></div>
+<div id="toast"></div>
+
+<script>
+'use strict';
+/* ============================================================
+   SSS — 本・漫画せどり専用 判定ツール（単一HTML／バックエンドなし）
+   データ: localStorage "sedoscope_s_v1"（SedoScope本体 "sedoscope_v1" とは別）
+   外部通信: openBD ISBN照会のみ
+   ============================================================ */
+const APP_VER='1.0.1';
+const APP_DATE='2026-10-24';
+const CHANGELOG=[
+  'v1.0.1（2026-10-24）SedoScope実データ対応：相場の販売状況(kind)・販路(svc)を読み取り／出品・売却の項目を対応付け／設定の引き継ぎ／セットの巻範囲を構成巻から自動設定／作品名が合わない相場を判定から除外',
+  'v1.0.0（2026-10-24）初版：即時判定／相場プール（保守的・標準、ばらつき・二峰性・鮮度）／SedoScopeバックアップ取り込み／相場CSV取り込み／拡張リンクボタン／欠巻・版違い・付属品チェック／重複警告／カゴ（予算内の推奨）／資金効率スコア／集計／バックアップ警告'
+];
+const KEY='sedoscope_s_v1';
+const CH=['m','y','r','a'];
+const ST={cand:'候補',stock:'仕入済',listed:'出品中',sold:'売却済'};
+const SIG={ss:['◎','買え'],s:['○','買え'],w:['△','要確認'],x:['✕','見送り'],n:['—','相場なし']};
+const ACC=[['obi','帯'],['cover','カバー'],['booklet','特典冊子'],['poster','ポスター'],['other','その他']];
+const EDS=['完全版','文庫版','愛蔵版','新装版','ワイド版','カラー版','デラックス版','復刻版','豪華版','新書版','大判','KCDX','B6判','A5判'];
+const DEF_LINKS=[
+  {id:'mer',name:'メルカリ（売り切れ）',url:'https://jp.mercari.com/search?keyword={title}&status=sold_out'},
+  {id:'ypf',name:'Yahoo!フリマ',url:'https://paypayfleamarket.yahoo.co.jp/search/{title}'},
+  {id:'rak',name:'ラクマ',url:'https://fril.jp/s?query={title}'},
+  {id:'yac',name:'ヤフオク（終了分）',url:'https://auctions.yahoo.co.jp/closedsearch/closedsearch?p={title}'},
+  {id:'auf',name:'オークフリー',url:'https://aucfree.com/search?q={title}'},
+  {id:'obd',name:'openBD書誌',url:'https://api.openbd.jp/v1/get?isbn={isbn}&pretty'}
+];
+function defSettings(){return{
+  target:30,mode:'cons',disp:3,fresh:30,dupDays:60,unsoldDays:45,backupWarn:14,
+  ch:{m:{name:'メルカリ',fee:10,ship:210,on:true},y:{name:'Yahoo!フリマ',fee:5,ship:210,on:true},
+      r:{name:'ラクマ',fee:10,ship:210,on:true},a:{name:'ヤフオク',fee:10,ship:210,on:true}},
+  pack:30,other:0,main:'m',pick:'main',
+  acc:{obi:10,cover:30,booklet:10,poster:5,other:0},
+  store:'',budget:'',autoQueue:false
+}}
+function defState(){return{schema:1,items:[],queue:[],biblio:{},settings:defSettings(),links:DEF_LINKS.map(x=>({...x})),
+  meta:{created:new Date().toISOString(),lastBackup:null,imports:[]}}}
+
+/* ---------- 保存 ---------- */
+function fixState(s){
+  const d=defState(); if(!s||typeof s!=='object'||Array.isArray(s)) return d;
+  s.items=Array.isArray(s.items)?s.items.filter(x=>x&&typeof x==='object'):[];
+  s.queue=Array.isArray(s.queue)?s.queue:[];
+  s.biblio=(s.biblio&&typeof s.biblio==='object')?s.biblio:{};
+  const ds=defSettings(), ss=(s.settings&&typeof s.settings==='object')?s.settings:{};
+  const ch={}; for(const c of CH) ch[c]=Object.assign({},ds.ch[c],(ss.ch||{})[c]||{});
+  s.settings=Object.assign(ds,ss,{ch,acc:Object.assign({},ds.acc,ss.acc||{})});
+  s.links=Array.isArray(s.links)?s.links:d.links;
+  s.meta=Object.assign(d.meta,s.meta||{});
+  s.schema=1; return s;
+}
+function load(){let s=null;try{const t=localStorage.getItem(KEY);if(t)s=JSON.parse(t)}catch(e){console.warn(e)}return fixState(s)}
+let S=load();
+let IDX=null;
+function save(){
+  IDX=null;
+  try{localStorage.setItem(KEY,JSON.stringify(S));return true}
+  catch(e){toast('保存できませんでした（端末の保存容量不足の可能性）。バックアップを書き出してください');return false}
+}
+
+/* ---------- 小道具 ---------- */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+function num(v){if(v===null||v===undefined||v==='')return NaN;if(typeof v==='number')return v;
+  const t=String(v).normalize('NFKC').replace(/[,¥￥円\s]/g,'');const m=t.match(/-?\d+(\.\d+)?/);return m?Number(m[0]):NaN}
+function fnum(it,k,def){if(it&&it[k]!==''&&it[k]!=null&&isFinite(num(it[k])))return num(it[k]);return def}
+const yen=(n,cls='')=>isFinite(n)?`<span class="num ${cls}">${Math.round(n).toLocaleString('ja-JP')}</span><small class="u">円</small>`:'<span class="num mut">—</span>';
+const yenT=n=>isFinite(n)?Math.round(n).toLocaleString('ja-JP')+'円':'—';
+const pct=n=>isFinite(n)?(n*100).toFixed(1)+'%':'—';
+function median(a){if(!a.length)return NaN;const b=[...a].sort((x,y)=>x-y),m=b.length>>1;return b.length%2?b[m]:(b[m-1]+b[m])/2}
+function today(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function ymd(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function pd(s){if(!s)return null;if(s instanceof Date)return s;if(typeof s==='number')return new Date(s);
+  const t=String(s).normalize('NFKC').trim();const m=t.match(/(\d{4})[-\/.年](\d{1,2})[-\/.月](\d{1,2})/);
+  if(m)return new Date(+m[1],m[2]-1,+m[3]);const d=new Date(t);return isNaN(d)?null:new Date(d.getFullYear(),d.getMonth(),d.getDate())}
+function daysAgo(s){const d=pd(s);if(!d)return null;const n=new Date();n.setHours(0,0,0,0);return Math.round((n-d)/864e5)}
+function mdShort(s){const d=pd(s);return d?(d.getMonth()+1)+'/'+d.getDate():'—'}
+let toastT=null;
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('on'),2600)}
+
+/* ---------- コード（ISBN/JAN） ---------- */
+function ean13ok(c){if(!/^\d{13}$/.test(c))return false;let s=0;for(let i=0;i<12;i++)s+=(+c[i])*(i%2?3:1);return (10-s%10)%10===+c[12]}
+function isbn10to13(t){const b='978'+t.slice(0,9);let s=0;for(let i=0;i<12;i++)s+=(+b[i])*(i%2?3:1);return b+((10-s%10)%10)}
+function normCode(v){let t=String(v??'').normalize('NFKC').replace(/[^0-9Xx]/g,'').toUpperCase();
+  if(/^\d{9}[\dX]$/.test(t))return isbn10to13(t);
+  if(/^\d{13}$/.test(t)||/^\d{8}$/.test(t))return t;return t.replace(/X/g,'')}
+function okScanCode(c){return ean13ok(c)&&!/^19[0-9]/.test(c)}   // 書籍の2段目(192…)は無視
+const isISBN=c=>/^97[89]\d{10}$/.test(c);
+
+/* ---------- 正規化 ---------- */
+function workKey(s){
+  if(!s)return '';let t=String(s).normalize('NFKC').toLowerCase();
+  t=t.replace(/[【\[(（「『〈<][^】\])）」』〉>]*[】\])）」』〉>]/g,' ');
+  t=t.replace(/全\s*\d+\s*巻|\d+\s*[-~〜～]\s*\d+\s*巻?|第?\s*\d+\s*巻|vol\.?\s*\d+/g,' ');
+  t=t.replace(/全巻|完結|セット|初版|帯付き?|チラシ付き?|特典付き?|美品|中古|コミックス?|漫画|まとめ売り?|送料無料|即購入可/g,' ');
+  t=t.replace(/[\s・:：!！?？、。,.\-_~〜～\/／|｜+＋'"]+/g,'');
+  t=t.replace(/\d+$/,'');
+  return t;
+}
+function chKey(v){const t=String(v??'').normalize('NFKC').toLowerCase().trim();if(!t)return 'o';
+  if(CH.includes(t))return t;
+  if(/メルカリ|mercari|^pm$/.test(t))return 'm';
+  if(/フリマ|paypay|^py$/.test(t))return 'y';
+  if(/ラクマ|rakuma|fril|楽天|^pr$/.test(t))return 'r';
+  if(/ヤフオク|オークション|auction|aucfree|オークフリー|^pa$/.test(t))return 'a';
+  return 'o'}
+function qStatus(v){if(v===true)return 'sold';if(v===false)return 'listing';const t=String(v??'').normalize('NFKC').toLowerCase();
+  if(/出品|販売中|on.?sale|listing|active|公開中|selling/.test(t))return 'listing';
+  if(/sold|売|済|終了|落札|取引/.test(t))return 'sold';return ''}
+function normQuote(q){
+  if(!q||typeof q!=='object')return null;const o={...q};
+  const p=num(q.price??q.p??q.v??q.val??q.value??q.yen??q['価格']);o.price=isFinite(p)?p:NaN;
+  o.status=qStatus(q.status??q.kind??q.st??q.sold??q.state??q.s??q['販売状況']);
+  o.cond=String(q.cond??q.c??q.condition??q['商品の状態']??'');
+  let dv=q.date??q.d??q.at??q.ts??q.day??'';if(typeof dv==='number')dv=ymd(new Date(dv));o.date=String(dv);
+  o.src=String(q.src??q.source??q.site??q.mk??'');o.ch=chKey(q.svc??q.ch??q.src??q.source??q.site??'');
+  o.title=String(q.title??q.name??q.n??q['商品名']??'');
+  return o}
+function normSt(v){if(ST[v])return v;const t=String(v??'').normalize('NFKC').toLowerCase();
+  if(/sold|売却|売れ|販売済|done/.test(t))return 'sold';
+  if(/list|出品/.test(t))return 'listed';
+  if(/stock|inv|bought|purch|仕入|在庫|own|have/.test(t))return 'stock';
+  if(/cand|候補|research|watch|リサーチ|検討/.test(t))return 'cand';
+  return {'0':'cand','1':'stock','2':'listed','3':'sold'}[t]||'cand'}
+const qKey=q=>[q.title,q.price,q.status,q.cond,q.ch].join('|');
+function getItem(id){return S.items.find(x=>String(x.id)===String(id))||null}
+function newItem(o){return Object.assign({id:uid(),name:'',code:'',st:'cand',date:today(),quotes:[],created:new Date().toISOString()},o)}
+function itemCover(it){return it&&(it.cover||(S.biblio[normCode(it.code)]||{}).cover)||''}
+
+/* ---------- 相場プール ---------- */
+function index(){
+  if(IDX)return IDX;const by=new Map(),keyOf=new Map();
+  for(const it of S.items){const k=workKey(it.work||it.name);keyOf.set(it,k);if(!k)continue;if(!by.has(k))by.set(k,[]);by.get(k).push(it)}
+  return IDX={by,keyOf};
+}
+const itemKey=it=>index().keyOf.get(it)??workKey(it.work||it.name);
+function poolItemsFor(key){
+  if(!key)return [];const {by}=index();if(by.has(key))return by.get(key).slice();
+  if(key.length<3)return [];const out=[];
+  for(const [k,arr] of by){if(k.length>=3&&(k.includes(key)||key.includes(k)))out.push(...arr)}
+  return out;
+}
+const tnorm=t=>String(t||'').normalize('NFKC').toLowerCase().replace(/[\s・:：!！?？、。,.\-_~〜～\/／|｜+＋'"★☆【】\[\]()（）「」『』]+/g,'');
+function titleOk(q,key){return !q.title||!key||key.length<2||tnorm(q.title).includes(key)}
+function poolQuotes(items,key){const seen=new Set(),out=[];let ex=0;
+  for(const it of items)for(const q of (it.quotes||[])){if(!q||!(q.price>0))continue;if(!titleOk(q,key)){ex++;continue}const k=qKey(q)+'|'+q.date;if(seen.has(k))continue;seen.add(k);out.push(q)}
+  out.excluded=ex;return out}
+function qstats(qs){
+  const sold=qs.filter(q=>q.status==='sold'),lis=qs.filter(q=>q.status==='listing');
+  const sp=sold.map(q=>q.price).sort((a,b)=>a-b);let latest=null;
+  for(const q of sold){const d=pd(q.date);if(d&&(!latest||d>latest))latest=d}
+  const srcs=[...new Set(qs.map(q=>q.ch&&q.ch!=='o'?S.settings.ch[q.ch].name:(q.src||'販路不明')))];
+  const cond={};for(const q of sold){const c=q.cond||'状態不明';(cond[c]=cond[c]||[]).push(q.price)}
+  return{soldN:sold.length,lisN:lis.length,sp,hi:sp.length?sp[sp.length-1]:NaN,lo:sp.length?sp[0]:NaN,med:median(sp),
+    lisLo:lis.length?Math.min(...lis.map(q=>q.price)):NaN,latest,srcs,cond}
+}
+function bimodal(sp){if(sp.length<4)return false;const a=[...sp].sort((x,y)=>x-y);let best=0,idx=-1;
+  for(let i=1;i<a.length;i++){const r=a[i]/a[i-1];if(r>best){best=r;idx=i}}
+  return best>=1.6&&idx>=2&&a.length-idx>=2}
+function parseVols(s){const set=new Set();String(s||'').normalize('NFKC').split(/[,、\s]+/).forEach(p=>{
+  const m=p.match(/^(\d+)(?:[-~〜](\d+))?$/);if(!m)return;const a=+m[1],b=m[2]?+m[2]:a;if(Math.abs(b-a)>500)return;
+  for(let i=Math.min(a,b);i<=Math.max(a,b);i++)set.add(i)});return set}
+function volOf(name){const t=String(name||'').normalize('NFKC');
+  const m=t.match(/第?\s*(\d+)\s*巻/)||t.match(/vol\.?\s*(\d+)/i)||t.match(/\s(\d{1,3})\s*$/);return m?+m[1]:null}
+function volCheck(it,pool){
+  if(!it||!it.range)return null;const need=parseVols(it.range);if(!need.size)return null;
+  let have,src;
+  if(it.have){have=parseVols(it.have);src='手元の巻の入力'}
+  else{have=new Set();for(const p of pool){if(p===it||p.st==='sold'||/セット/.test(String(p.setk||'')+String(p.name||''))||Array.isArray(p.members))continue;const vv=String(p.vols??'').normalize('NFKC').trim();const v=/^\d+$/.test(vv)?+vv:volOf(p.name);if(v)have.add(v)}src='登録済みの単巻';if(!have.size)return{need:need.size,missing:[],unknown:true}}
+  return{need:need.size,missing:[...need].filter(v=>!have.has(v)).sort((a,b)=>a-b),src}
+}
+function edWords(s){const t=String(s||'').normalize('NFKC');return EDS.filter(w=>t.includes(w))}
+function editionNote(title,pool,it){
+  const cur=new Set(edWords(title+' '+(it&&it.tags||'')));const others=new Set();let plain=0,total=0;
+  for(const p of pool){const texts=[p.name,...(p.quotes||[]).map(q=>q.title)].filter(Boolean);
+    for(const tx of texts){if(p===it&&tx===p.name)continue;total++;const w=edWords(tx);if(!w.length)plain++;w.forEach(x=>others.add(x))}}
+  const out=[...others].filter(w=>!cur.has(w));
+  if(cur.size&&plain>0)out.push('通常版');
+  return out}
+function dupInfo(code,exId){
+  const c=normCode(code);if(!c)return [];const out=[];
+  for(const it of S.items){if(String(it.id)===String(exId)||normCode(it.code)!==c)continue;
+    if(it.st==='stock'||it.st==='listed')out.push({lv:'bad',t:`${ST[it.st]}に同じISBNあり`,id:it.id});
+    else if(it.st==='sold'){const d=daysAgo(it.soldDate||it.date);if(d!==null&&d<=S.settings.dupDays)out.push({lv:'warn',t:`${d}日前に売却済み`,id:it.id})}
+    else out.push({lv:'info',t:'候補に登録済み',id:it.id})}
+  return out}
+function accFactor(it){let f=1;const miss=[];
+  if(it&&it.acc)for(const [k,l] of ACC){if(it.acc[k]==='no'){const r=num(S.settings.acc[k])||0;f*=1-r/100;miss.push(l+'なし'+(r?`（-${r}%）`:''))}}
+  return{f,miss}}
+
+/* ---------- 判定 ---------- */
+function analyze(ctx){
+  const set=S.settings,r=num(set.target)/100;
+  const it=ctx.itemId?getItem(ctx.itemId):null;
+  const title=ctx.title||(it&&it.name)||'';
+  const key=it?itemKey(it):workKey(ctx.work||title);
+  let pool=poolItemsFor(key);if(it&&!pool.includes(it))pool.unshift(it);
+  const qs=poolQuotes(pool,key),st=qstats(qs),acc=accFactor(it);
+  const chs=[];
+  for(const c of CH){const cs=set.ch[c];if(!cs.on)continue;let base=NaN,basis='';const man=it?num(it['p'+c]):NaN;
+    if(man>0){base=man;basis='手入力の想定価格'}
+    else{const own=qs.filter(q=>q.status==='sold'&&q.ch===c).map(q=>q.price);const arr=own.length?own:st.sp;
+      if(arr.length){base=set.mode==='cons'?Math.min(...arr):median(arr);basis=(set.mode==='cons'?'底値':'中央値')+'・'+(own.length?`${cs.name}の売り切れ${own.length}件`:`全販路の売り切れ${arr.length}件`)}
+      else if(it&&num(it.lo)>0){const lo=num(it.lo),hi=num(it.hi)>0?num(it.hi):lo;base=set.mode==='cons'?lo:Math.round((lo+hi)/2);basis='登録済みの想定価格（下限/上限）'}}
+    if(!(base>0))continue;
+    const sale=Math.round(base*acc.f),fee=Math.round(sale*(num(cs.fee)||0)/100);
+    const ship=fnum(it,'ship',num(cs.ship)||0),pack=fnum(it,'pack',num(set.pack)||0),other=fnum(it,'other',num(set.other)||0);
+    const net=sale-fee-ship-pack-other;const max=Math.floor((net-sale*r)/10)*10;
+    chs.push({c,name:cs.name,base,sale,fee,ship,pack,other,net,max,basis})}
+  let best=null;if(chs.length){if(set.pick==='main')best=chs.find(x=>x.c===set.main)||null;if(!best)best=chs.reduce((a,b)=>b.max>a.max?b:a)}
+  const sd=st.latest?daysAgo(st.latest):null;
+  const flags={
+    disp:st.sp.length>=2&&st.lo>0&&st.hi/st.lo>num(set.disp),
+    bimodal:bimodal(st.sp),
+    stale:st.soldN>0&&(sd===null||sd>num(set.fresh)),staleDays:sd,
+    few:st.soldN<3,
+    vol:volCheck(it,pool),
+    ed:editionNote(title,pool,it),
+    dup:dupInfo(ctx.code||(it&&it.code),ctx.scan?null:(it&&it.id)),
+    acc:acc.miss,
+    excluded:qs.excluded
+  };
+  flags.missing=flags.vol&&flags.vol.missing.length?flags.vol.missing:[];
+  return{it,title,key,pool,qs,st,chs,best,flags};
+}
+function evalPrice(a,price){
+  const b=a.best,r=num(S.settings.target)/100,f=a.flags;
+  if(!b)return{sig:'n',profit:NaN,rate:NaN,price:NaN};
+  const p=num(price);let sig=null,profit=NaN,rate=NaN;
+  if(isFinite(p)){profit=b.net-p;rate=profit/b.sale;sig=profit<=0?'x':rate>=r?((rate>=r+0.15&&a.st.soldN>=3)?'ss':'s'):'w'}
+  const down=f.disp||f.bimodal||f.missing.length>0;
+  if(down&&sig!=='x')sig='w';
+  if(sig==='ss'&&(f.stale||f.few))sig='s';
+  return{sig,profit,rate,price:p};
+}
+function effScore(a,ev){
+  if(!a.best||!(ev.profit>0))return null;const n=a.st.soldN;
+  let prob=Math.min(0.9,0.25+0.13*n);const why=[`売り切れ${n}件 → 売れる確率の目安 ${Math.round(prob*100)}%`];
+  if(a.flags.stale){prob*=0.6;why.push('鮮度低下のため ×0.6')}
+  if(a.flags.disp){prob*=0.7;why.push('ばらつき大のため ×0.7')}
+  const days=Math.max(7,Math.round(60/(1+n/3)));why.push(`想定在庫日数の目安 ${days}日（売り切れ件数が多いほど短く見積もり）`);
+  const total=ev.price+a.best.other;const v=total>0?ev.profit*prob/(total*days)*100:ev.profit*prob/days;
+  return{v,prob,days,total,why};
+}
+
+/* ---------- openBD ---------- */
+async function fetchBiblio(isbn){
+  if(S.biblio[isbn]&&S.biblio[isbn].title)return S.biblio[isbn];
+  if(!isISBN(isbn))return{none:true};
+  const ctl=new AbortController(),tm=setTimeout(()=>ctl.abort(),7000);
+  try{
+    const r=await fetch('https://api.openbd.jp/v1/get?isbn='+isbn,{signal:ctl.signal});const j=await r.json();
+    const s=j&&j[0]&&j[0].summary;if(!s)return{none:true};
+    let title=(s.title||'').trim();if(s.volume&&!title.endsWith(s.volume))title+=' '+s.volume;
+    let form='';try{const dd=j[0].onix.DescriptiveDetail;form=(dd.ProductFormDetail||'')+''}catch(e){}
+    const b={title,series:s.series||'',author:s.author||'',pub:s.publisher||'',pubdate:s.pubdate||'',cover:s.cover||'',form,at:today()};
+    S.biblio[isbn]=b;const ks=Object.keys(S.biblio);if(ks.length>3000)delete S.biblio[ks[0]];save();return b;
+  }catch(e){return{err:true}}finally{clearTimeout(tm)}
+}
+
+/* ============================================================
+   画面
+   ============================================================ */
+const UI={tab:'look',listF:'all',listQ:'',listN:150,cartSort:'eff',per:'month',padOpen:true,search:null};
+let CUR=null;   // 調べている本 {code,title,author,pub,cover,itemId,price,loading,netErr}
+
+function setTab(t){
+  if(UI.tab==='look'&&t!=='look')stopScan();
+  UI.tab=t;document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));
+  render();window.scrollTo(0,0);
+}
+function render(){
+  $('#ver').textContent='v'+APP_VER;$('#hdStore').textContent=S.settings.store?('🏬 '+S.settings.store):'';
+  renderBanner();renderBadge();
+  const v=$('#view');v.classList.toggle('withpad',UI.tab==='look');$('#pad').hidden=UI.tab!=='look';
+  if(UI.tab==='look'){v.innerHTML=lookHTML();renderPad();renderResult()}
+  else if(UI.tab==='cart')v.innerHTML=cartHTML();
+  else if(UI.tab==='list')v.innerHTML=listHTML();
+  else if(UI.tab==='stats')v.innerHTML=statsHTML();
+  else v.innerHTML=setHTML();
+}
+function renderBadge(){const b=$('#qbadge');b.hidden=!S.queue.length;b.textContent=S.queue.length}
+function renderBanner(){
+  const lb=S.meta.lastBackup,el=$('#banner');let msg='';
+  if(S.items.length){if(!lb)msg='まだバックアップを書き出していません。';else{const d=daysAgo(lb);if(d>num(S.settings.backupWarn))msg=`前回のバックアップから${d}日経過しています。`}}
+  el.innerHTML=msg?`<div class="banner">⚠️ ${esc(msg)}<button data-act="doBackup">今すぐ書き出す</button></div>`:'';
+}
+
+/* ---------- 調べる ---------- */
+function lookHTML(){
+  return `<div class="srch"><input id="q" type="search" inputmode="search" placeholder="ISBN／JAN／タイトル" enterkeyhint="search" autocomplete="off"><button class="btn pri" data-act="doSearch">検索</button></div>
+  <div id="camWrap"></div><div id="srchRes"></div><div id="res"></div>`;
+}
+function renderPad(){
+  const p=$('#pad');
+  p.innerHTML=`<div class="pricebar"><span class="lbl">店頭価格</span><span id="pv" class="num"></span><small class="u">円</small><button class="tg" data-act="padToggle">${UI.padOpen?'キー閉じる':'キー開く'}</button></div>
+  ${UI.padOpen?`<div class="keys">${[[1,2,3],[4,5,6],[7,8,9],['C',0,'B']].map((r,i)=>r.map(k=>`<button ${k==='C'||k==='B'?'class="fn" ':''}data-act="key" data-k="${k}">${k==='B'?'⌫':k}</button>`).join('')+
+    [`<button class="a ${Scan.on?'scan-on':'pri'}" data-act="scanToggle">${Scan.on?'■ 停止':'📷 スキャン'}</button>`,'<button class="a" data-act="toCart">カゴへ</button>','<button class="a" data-act="regStock">仕入れた</button>','<button class="a" data-act="regCand">候補保存</button>'][i]).join('')}</div>`
+  :`<div class="acts"><button class="${Scan.on?'scan-on':'pri'}" data-act="scanToggle">${Scan.on?'■ 停止':'📷 スキャン'}</button><button data-act="toCart">カゴへ</button><button data-act="regStock">仕入れた</button><button data-act="regCand">候補保存</button></div>`}`;
+  document.documentElement.style.setProperty('--padh',p.offsetHeight+'px');
+  updatePV();
+}
+function updatePV(){const e=$('#pv');if(e)e.textContent=CUR&&CUR.price!==''&&CUR.price!=null?Number(CUR.price).toLocaleString('ja-JP'):'—'}
+function renderResult(){
+  const el=$('#res');if(!el)return;
+  if(!CUR){el.innerHTML=`<div class="empty">📷 スキャン、またはISBN／タイトルを入力して調べます。<br><span class="note">相場データ：登録済み ${S.items.length}商品／相場 ${S.items.reduce((s,i)=>s+(i.quotes||[]).length,0)}件</span></div>`;return}
+  const a=analyze(CUR),ev=evalPrice(a,CUR.price),sc=effScore(a,ev),f=a.flags,b=a.best;
+  const cover=CUR.cover||(a.it&&itemCover(a.it));
+  const sub=[CUR.author,CUR.pub,CUR.code].filter(Boolean).map(esc).join('／');
+  let head=`<div class="bib">${cover?`<img src="${esc(cover)}" alt="" onerror="this.remove()">`:''}<div style="min-width:0;flex:1">
+    <div class="t">${CUR.title?esc(CUR.title):'<span class="mut">書名未取得</span>'}</div><div class="s">${sub}${CUR.loading?'　<span>書誌を取得中…</span>':''}</div>
+    ${a.it?`<div class="s"><span class="st ${a.it.st}">${ST[a.it.st]||''}</span>登録済み</div>`:''}</div></div>`;
+  if(!CUR.title&&!a.it){
+    head+=`<div class="fld" style="margin-top:8px"><label>${CUR.netErr?'書誌を取得できませんでした（電波なし等）。':CUR.noBib?'openBDに書誌がありません。':''}書名を入力すると相場プールと照合します</label>
+      <div class="row"><input id="manTitle" placeholder="例：ワンピース"><button class="btn" data-act="setManTitle">照合</button></div></div>`;
+  }
+  const sigK=ev.sig||(b?null:'n');
+  let mid;
+  if(!b){
+    mid=`<div class="judge"><div class="sig n"><div class="mk">—</div><div class="tx">相場なし</div></div><div class="kp"><div class="mut" style="font-size:13px">この作品の相場がまだありません。下のボタンで相場を確認し、相場CSVを取り込むと判定できます。</div></div></div>`;
+  }else{
+    const refNote=f.disp?'<div class="note">※ばらつき大のため参考値</div>':'';
+    if(sigK){const [m,t]=SIG[sigK];
+      mid=`<div class="judge"><div class="sig ${sigK}"><div class="mk">${m}</div><div class="tx">${t}</div></div>
+      <div class="kp"><label>仕入上限</label><div class="big">${yen(b.max)}</div>
+      ${isFinite(ev.profit)?`<label>予想利益（利益率）</label><div class="mid ${ev.profit>0?'pos':'neg'}">${yen(ev.profit)} <span class="num" style="font-size:15px">${pct(ev.rate)}</span></div>`:'<div class="note">店頭価格を入力すると判定します</div>'}${refNote}</div></div>`;
+    }else{
+      mid=`<div class="judge"><div class="sig n"><div class="mk">¥</div><div class="tx">価格入力</div></div>
+      <div class="kp"><label>仕入上限（目標${esc(S.settings.target)}%）</label><div class="big">${yen(b.max)}</div><div class="note">店頭価格を入力すると判定します</div>${refNote}</div></div>`;
+    }
+  }
+  let basis='';
+  if(b){basis=`<div class="basis">想定売価 ${yenT(b.sale)}（${esc(b.name)}／${esc(b.basis)}）・最新売り切れ ${a.st.latest?mdShort(a.st.latest)+`（${f.staleDays}日前）`:'—'}・売切${a.st.soldN}件／出品中${a.st.lisN}件</div>`}
+  const chips=[];
+  for(const d of f.dup)chips.push(`<span class="chip ${d.lv}" data-act="openItem" data-id="${esc(d.id)}">${d.lv==='bad'?'⛔ ':''}${esc(d.t)}</span>`);
+  if(f.disp)chips.push(`<span class="chip warn">⚠ ばらつき大（高値÷底値 ${(a.st.hi/a.st.lo).toFixed(1)}倍）</span>`);
+  if(f.bimodal)chips.push(`<span class="chip warn">⚠ 価格帯が2つに分かれています（初版/復刊など混在注意）</span>`);
+  if(f.stale)chips.push(`<span class="chip warn">⏳ 鮮度低下${f.staleDays!==null?`（${f.staleDays}日前）`:'（日付不明）'}→再調査リスト</span>`);
+  if(b&&f.few)chips.push(`<span class="chip info">売り切れ${a.st.soldN}件（件数少なめ）</span>`);
+  if(f.missing.length)chips.push(`<span class="chip bad">欠巻 ${esc(compactVols(f.missing))}</span>`);
+  if(f.ed.length)chips.push(`<span class="chip warn">版違い注意：${esc(f.ed.join('・'))}が同作品にあり</span>`);
+  if(f.excluded)chips.push(`<span class="chip info">作品名が合わない相場${f.excluded}件は除外</span>`);
+  if(f.acc.length)chips.push(`<span class="chip info">付属品 ${esc(f.acc.join('・'))}</span>`);
+  if(b&&b.basis.startsWith('手入力'))chips.push(`<span class="chip info">手入力の想定価格を使用</span>`);
+  const links=linksHTML({title:CUR.title||(a.it&&a.it.name)||'',code:CUR.code||(a.it&&a.it.code)||'',author:CUR.author||(a.it&&a.it.author)||''});
+  el.innerHTML=`<div class="card">${head}${mid}${basis}${chips.length?`<div class="chips">${chips.join('')}</div>`:''}${links}
+    <details class="det"${UI.detOpen?' open':''} ontoggle="UI.detOpen=this.open"><summary>▼ 詳しい数値・根拠</summary>${detailHTML(a,ev,sc)}</details></div>`;
+}
+function focusRes(){requestAnimationFrame(()=>{const r=Scan.on?$('#camWrap'):$('#res');if(!r)return;const hd=$('header').offsetHeight;window.scrollTo({top:Math.max(0,r.getBoundingClientRect().top+window.scrollY-hd-6),behavior:'smooth'})})}
+function compactVols(a){const out=[];let s=a[0],p=a[0];for(let i=1;i<=a.length;i++){if(a[i]===p+1){p=a[i];continue}out.push(s===p?s:`${s}-${p}`);s=p=a[i]}return out.join(',')+'巻'}
+function detailHTML(a,ev,sc){
+  const st=a.st,set=S.settings;let h='';
+  if(a.chs.length){
+    h+=`<div class="sec">販路別（${set.mode==='cons'?'保守的＝底値':'標準＝中央値'}・目標利益率${esc(set.target)}%）</div><table><tr><th>販路</th><th>想定売価</th><th>手数料</th><th>送料+梱包+他</th><th>仕入上限</th>${isFinite(ev.price)?'<th>利益</th>':''}</tr>`+
+    a.chs.map(c=>`<tr${a.best===c?' style="color:var(--ss)"':''}><td>${esc(c.name)}${a.best===c?' ★':''}</td><td class="num">${yenT(c.sale)}</td><td class="num">${yenT(c.fee)}</td><td class="num">${yenT(c.ship+c.pack+c.other)}</td><td class="num">${yenT(c.max)}</td>${isFinite(ev.price)?`<td class="num">${yenT(c.net-ev.price)}</td>`:''}</tr>`).join('')+`</table>`;
+    h+=`<div class="note" style="margin-top:4px">計算：仕入上限＝想定売価−手数料−送料−梱包費−その他−想定売価×目標利益率（10円単位切り捨て）。利益率＝利益÷想定売価。</div>`;
+  }
+  h+=`<div class="sec">相場プール（作品キー「${esc(a.key||'—')}」・${a.pool.length}商品で共有）</div>
+  <table><tr><td>高値</td><td class="num">${yenT(st.hi)}</td><td>底値</td><td class="num">${yenT(st.lo)}</td></tr>
+  <tr><td>中央値</td><td class="num">${yenT(st.med)}</td><td>出品中の最安</td><td class="num">${yenT(st.lisLo)}</td></tr>
+  <tr><td>売り切れ</td><td class="num">${st.soldN}件</td><td>出品中</td><td class="num">${st.lisN}件</td></tr>
+  <tr><td>最新売り切れ</td><td class="num" colspan="3">${st.latest?ymd(st.latest):'—'}</td></tr>
+  <tr><td>販路ソース</td><td colspan="3" style="white-space:normal">${esc(st.srcs.join('・')||'—')}</td></tr></table>`;
+  const ck=Object.keys(st.cond);if(ck.length)h+=`<div class="sec">状態別（売り切れ）</div><table><tr><th>状態</th><th>件数</th><th>底値</th><th>中央値</th></tr>${ck.map(k=>{const v=st.cond[k];return`<tr><td>${esc(k)}</td><td class="num">${v.length}</td><td class="num">${yenT(Math.min(...v))}</td><td class="num">${yenT(median(v))}</td></tr>`}).join('')}</table>`;
+  if(a.pool.length)h+=`<div class="note" style="margin-top:6px">共有元：${a.pool.slice(0,6).map(p=>`<a href="#" data-act="openItem" data-id="${esc(p.id)}">${esc(p.name||'(無題)')}</a>`).join('、')}${a.pool.length>6?' ほか':''}</div>`;
+  if(a.flags.vol){const v=a.flags.vol;h+=`<div class="sec">欠巻チェック</div><div class="note">${v.unknown?`巻範囲 ${v.need}巻分。「手元の巻」を入力するか単巻を登録すると判定します。`:v.missing.length?`欠け：${esc(compactVols(v.missing))}（${esc(v.src)}と照合）`:`欠巻なし（${esc(v.src)}と照合）`}</div>`}
+  if(sc)h+=`<div class="sec">資金効率スコア <span class="num">${sc.v.toFixed(1)}</span></div><div class="note">予想利益 × 売れる確率 ÷（仕入総額 ${yenT(sc.total)} × 想定在庫日数）×100<br>${sc.why.map(esc).join('<br>')}</div>`;
+  h+=`<div class="btns" style="margin-top:10px">${a.it?`<button class="btn sm" data-act="openItem" data-id="${esc(a.it.id)}">商品を編集</button>`:''}<button class="btn sm" data-act="csvFor">この本に相場CSVを取り込む</button><button class="btn sm" data-act="quoteFor">相場を1件手入力</button></div>`;
+  return h;
+}
+function fillTpl(url,ctx){
+  const code=normCode(ctx.code);const m={title:ctx.title||'',isbn:isISBN(code)?code:'',jan:code,author:ctx.author||''};
+  return url.replace(/\{(title|isbn|jan|author)\}/g,(_,k)=>encodeURIComponent(m[k]));
+}
+function linksHTML(ctx){
+  if(!S.links.length)return '';
+  return `<div class="links">${S.links.map(l=>{const needIsbn=/\{isbn\}/.test(l.url)&&!isISBN(normCode(ctx.code));const needT=/\{title\}/.test(l.url)&&!ctx.title;
+    if(needIsbn||needT)return '';return `<a href="${esc(fillTpl(l.url,ctx))}" target="_blank" rel="noopener noreferrer">${esc(l.name)} ↗</a>`}).join('')}</div>`;
+}
+async function lookupCode(raw,opts={}){
+  const code=normCode(raw);if(!code){toast('コードを読み取れませんでした');return}
+  const it=S.items.find(x=>normCode(x.code)===code)||null,bb=S.biblio[code]||{};
+  CUR={code,itemId:it?it.id:null,title:(it&&it.name)||bb.title||'',author:(it&&it.author)||bb.author||'',pub:(it&&it.pub)||bb.pub||'',cover:(it&&itemCover(it))||bb.cover||'',price:'',loading:false,scan:true};
+  UI.search=null;const sr=$('#srchRes');if(sr)sr.innerHTML='';focusRes();
+  if(isISBN(code)&&(!CUR.title||!CUR.cover)&&!bb.title){
+    CUR.loading=true;renderResult();updatePV();
+    const b=await fetchBiblio(code);if(!CUR||CUR.code!==code)return;CUR.loading=false;
+    if(b&&b.title){CUR.title=CUR.title||b.title;CUR.author=CUR.author||b.author;CUR.pub=CUR.pub||b.pub;CUR.cover=CUR.cover||b.cover}
+    else if(b&&b.err)CUR.netErr=true;else CUR.noBib=true;
+  }
+  renderResult();updatePV();
+  if(opts.auto&&S.settings.autoQueue)addQueue(true);
+}
+function doSearch(){
+  const q=($('#q').value||'').trim();if(!q)return;
+  const c=normCode(q);
+  if(/^\d{13}$/.test(c)||/^\d{8}$/.test(c)){$('#q').blur();lookupCode(c);return}
+  const nq=q.normalize('NFKC').toLowerCase(),wk=workKey(q);
+  const hits=S.items.filter(it=>String(it.name||'').normalize('NFKC').toLowerCase().includes(nq)||(wk&&itemKey(it).includes(wk))).slice(0,30);
+  const el=$('#srchRes');
+  el.innerHTML=`<div class="card"><div class="sec" style="margin-top:0">「${esc(q)}」の検索結果（端末内）</div>
+    <div class="list">${hits.map(it=>`<div class="it" data-act="pickItem" data-id="${esc(it.id)}">${thumb(it)}<div class="m"><div class="t">${esc(it.name)}</div><div class="s"><span class="st ${it.st}">${ST[it.st]||''}</span>${esc(it.code||'')}　相場${(it.quotes||[]).length}件</div></div></div>`).join('')||'<div class="note">登録済みの商品には見つかりませんでした。</div>'}</div>
+    <button class="btn" data-act="pickTitle" data-t="${esc(q)}">「${esc(q)}」として相場プールで仮判定</button>
+    <div class="note" style="margin-top:6px">※openBDはISBNでのみ照会できるため、タイトル検索は端末内データが対象です。</div></div>`;
+  $('#q').blur();
+}
+
+/* ---------- カゴ ---------- */
+function addQueue(silent){
+  if(!CUR||(!CUR.code&&!CUR.title)){toast('先に本を調べてください');return}
+  const ex=S.queue.find(q=>(CUR.code&&q.code===CUR.code)||(!CUR.code&&q.title===CUR.title));
+  const o={code:CUR.code,title:CUR.title,author:CUR.author,pub:CUR.pub,cover:CUR.cover,itemId:CUR.itemId,price:CUR.price===''?'':Number(CUR.price),ts:Date.now()};
+  if(ex){Object.assign(ex,o,{price:o.price===''?ex.price:o.price});S.queue.splice(S.queue.indexOf(ex),1);S.queue.unshift(ex);if(!silent)toast('カゴの内容を更新しました')}
+  else{S.queue.unshift(Object.assign({id:uid()},o));if(!silent)toast('カゴに入れました')}
+  save();renderBadge();
+}
+function cartRows(){
+  return S.queue.map(q=>{const a=analyze({itemId:q.itemId,title:q.title,code:q.code});const ev=evalPrice(a,q.price);return{q,a,ev,sc:effScore(a,ev)}});
+}
+function cartPicks(rows){
+  const bud=num(S.settings.budget);const pick=new Set();if(!(bud>0))return{pick,sum:0,prof:0};
+  const c=rows.filter(r=>r.ev.profit>0&&r.ev.price>0).sort((x,y)=>(y.ev.profit/y.ev.price)-(x.ev.profit/x.ev.price));
+  let sum=0,prof=0;for(const r of c){if(sum+r.ev.price<=bud){pick.add(r.q.id);sum+=r.ev.price;prof+=r.ev.profit}}
+  return{pick,sum,prof};
+}
+function cartHTML(){
+  if(!S.queue.length)return `<div class="empty">カゴは空です。<br>調べるタブで「カゴへ」を押すか、設定で「スキャンするたびカゴへ自動追加」をオンにしてください。</div>`;
+  const rows=cartRows();const k=UI.cartSort;
+  const sv=r=>k==='profit'?(r.ev.profit||-1e9):k==='rate'?(r.ev.rate||-1e9):k==='eff'?(r.sc?r.sc.v:-1e9):r.q.ts;
+  rows.sort((x,y)=>sv(y)-sv(x));
+  const {pick,sum,prof}=cartPicks(rows);
+  const tot=rows.reduce((s,r)=>s+(r.ev.price>0?r.ev.price:0),0),tp=rows.reduce((s,r)=>s+(r.ev.profit>0?r.ev.profit:0),0);
+  return `<div class="card"><div class="row"><div style="flex:1"><div class="note">合計（価格入力済み）</div><div>${yen(tot)}／利益 ${yen(tp,'')}</div></div>
+    <div><div class="note">予算</div><input class="inline-in" inputmode="numeric" data-set="budget" value="${esc(S.settings.budget)}" placeholder="円"></div></div>
+    ${pick.size?`<div class="note" style="margin-top:6px">★ 予算内の推奨 ${pick.size}冊：仕入 ${yenT(sum)}／予想利益 ${yenT(prof)}（利益÷仕入額の高い順に選択）</div>`:''}</div>
+  <div class="fchips">${[['eff','資金効率順'],['profit','利益額順'],['rate','利益率順'],['time','追加順']].map(([v,l])=>`<button class="${k===v?'on':''}" data-act="cartSort" data-v="${v}">${l}</button>`).join('')}</div>
+  <div class="list">${rows.map(r=>{const s=r.ev.sig||(r.a.best?'n':'n');return`<div class="it ${pick.has(r.q.id)?'pick':''}">
+    <span class="minisig ${s}">${SIG[s]?SIG[s][0]:'—'}</span>
+    <div class="m" data-act="cartOpen" data-id="${esc(r.q.id)}"><div class="t">${pick.has(r.q.id)?'★ ':''}${esc(r.q.title||r.q.code||'(無題)')}</div>
+    <div class="s">利益 ${yenT(r.ev.profit)}（${pct(r.ev.rate)}）・上限 ${yenT(r.a.best&&r.a.best.max)}・効率 ${r.sc?r.sc.v.toFixed(1):'—'}</div></div>
+    <div class="r"><input class="inline-in" inputmode="numeric" data-qprice="${esc(r.q.id)}" value="${esc(r.q.price)}" placeholder="価格"><br><button class="btn sm" data-act="qDel" data-id="${esc(r.q.id)}" style="margin-top:4px">見送り</button></div></div>`}).join('')}</div>
+  <div class="btns" style="margin-top:6px">${pick.size?`<button class="btn pri" data-act="buyPicks">★推奨${pick.size}冊を購入登録</button>`:''}<button class="btn" data-act="buyAll">全部を購入登録</button><button class="btn dng" data-act="qClear">全部見送り</button></div>
+  <div class="note" style="margin-top:8px">購入登録すると「仕入済」として一覧に入り、カゴから外れます。価格未入力の本は登録されません。</div>`;
+}
+function buyRows(ids){
+  let n=0,skip=0;const d=today();
+  for(const id of ids){const q=S.queue.find(x=>x.id===id);if(!q)continue;const p=num(q.price);if(!isFinite(p)){skip++;continue}
+    const ex=q.itemId?getItem(q.itemId):null;
+    if(ex&&ex.st==='cand'){Object.assign(ex,{st:'stock',cost:p,date:d,store:S.settings.store||ex.store||''})}
+    else{S.items.unshift(newItem({name:q.title||q.code,code:q.code,author:q.author||'',pub:q.pub||'',cover:q.cover||'',st:'stock',cost:p,date:d,store:S.settings.store||'',
+      work:ex&&ex.work||'',genre:ex&&ex.genre||''}))}
+    S.queue=S.queue.filter(x=>x.id!==id);n++}
+  save();toast(`${n}冊を購入登録しました${skip?`（価格未入力 ${skip}冊は残しました）`:''}`);render();
+}
+
+/* ---------- 一覧 ---------- */
+function thumb(it){const c=itemCover(it);return c?`<img src="${esc(c)}" alt="" loading="lazy" onerror="this.outerHTML='<div class=ph></div>'">`:'<div class="ph"></div>'}
+function soldProfit(it){
+  const sp=num(it.soldPrice??it.sp);if(!(sp>0))return NaN;let c=chKey(it.soldCh);if(c==='o')c=S.settings.main;const cs=S.settings.ch[c];
+  const fee=isFinite(num(it.soldFee))?num(it.soldFee):Math.round(sp*num(cs.fee)/100);
+  const ship=fnum(it,'soldShip',fnum(it,'ship',num(cs.ship)||0)),pack=fnum(it,'soldPack',fnum(it,'pack',num(S.settings.pack)||0)),other=fnum(it,'soldOther',fnum(it,'other',num(S.settings.other)||0));
+  return sp-fee-ship-pack-other-(num(it.cost)||0);
+}
+function expectProfit(it){const a=analyze({itemId:it.id});if(!a.best)return{a,p:NaN};const c=num(it.cost);return{a,p:isFinite(c)?a.best.net-c:NaN}}
+function recheckList(){
+  const seen=new Set(),out=[];
+  for(const it of S.items){if(it.st==='sold')continue;const k=itemKey(it);if(!k||seen.has(k))continue;seen.add(k);
+    const a=analyze({itemId:it.id});if(a.flags.stale)out.push({it,a})}
+  return out;
+}
+function listHTML(){
+  const f=UI.listF,q=UI.listQ.normalize('NFKC').toLowerCase();
+  let arr;
+  if(f==='re'){arr=recheckList().map(x=>x.it)}
+  else arr=S.items.filter(it=>f==='all'||it.st===f);
+  if(q)arr=arr.filter(it=>[it.name,it.code,it.author,it.tags,it.store,it.memo].join(' ').normalize('NFKC').toLowerCase().includes(q));
+  const cnt=k=>k==='all'?S.items.length:S.items.filter(i=>i.st===k).length;
+  const shown=arr.slice(0,UI.listN);
+  return `<div class="srch"><input id="lq" type="search" placeholder="タイトル・ISBN・タグ・店舗で絞り込み" value="${esc(UI.listQ)}"><button class="btn pri" data-act="newItem">＋新規</button></div>
+  <div class="fchips">${[['all','全部'],['cand','候補'],['stock','仕入済'],['listed','出品中'],['sold','売却済'],['re','再調査']].map(([k,l])=>`<button class="${f===k?'on':''}" data-act="listF" data-v="${k}">${l}${k!=='re'?' '+cnt(k):''}</button>`).join('')}</div>
+  ${f==='re'?'<div class="note" style="margin-bottom:8px">最新の売り切れから'+esc(S.settings.fresh)+'日を超えた（または日付不明の）作品です。相場を取り直して取り込んでください。</div>':''}
+  <div class="list">${shown.map(it=>{
+    let right='';
+    if(it.st==='sold'){const p=soldProfit(it);right=`<div class="note">確定利益</div><div class="num">${yenT(p)}</div>`}
+    else{const {p,a}=expectProfit(it);right=`<div class="note">${isFinite(p)?'見込み利益':'仕入上限'}</div><div class="num">${isFinite(p)?yenT(p):yenT(a.best&&a.best.max)}</div>`}
+    return `<div class="it" data-act="openItem" data-id="${esc(it.id)}">${thumb(it)}<div class="m"><div class="t">${esc(it.name||'(無題)')}</div>
+      <div class="s"><span class="st ${it.st}">${ST[it.st]||esc(it.st)}</span>${esc([it.cond,it.cost!==''&&it.cost!=null?'仕入'+yenT(num(it.cost)):'',it.store].filter(Boolean).join('・'))}</div></div><div class="r">${right}</div></div>`}).join('')||'<div class="empty">該当する商品はありません。</div>'}</div>
+  ${arr.length>shown.length?`<button class="btn" style="width:100%" data-act="more">さらに表示（残り${arr.length-shown.length}件）</button>`:''}`;
+}
+
+/* ---------- 商品編集 ---------- */
+const FIELDS=[
+  ['基本'],
+  ['name','商品名','text'],['code','ISBN／JAN','tel'],['work','作品名（相場の共有単位。空欄なら商品名から自動）','text'],
+  ['author','著者','text'],['pub','出版社','text'],['genre','ジャンル','text'],['cond','状態','text'],['st','ステータス','st'],
+  ['セット・巻'],
+  ['setk','区分（単巻／セット／画集・設定資料集など）','text'],['vols','巻数','text'],['range','セットの巻範囲（例 1-20）','text'],['have','手元の巻（例 1-5,7-20）','text'],
+  ['費用'],
+  ['cost','仕入価格','num'],['ship','発送料（空欄＝販路の既定値）','num'],['pack','梱包費（空欄＝既定値）','num'],['other','その他費用・仕入送料（空欄＝既定値）','num'],
+  ['store','仕入店舗','text'],['date','仕入日','date'],
+  ['想定売価（手入力すると相場より優先）'],
+  ['pm','メルカリ','num'],['py','Yahoo!フリマ','num'],['pr','ラクマ','num'],['pa','ヤフオク','num'],['lo','想定 下限','num'],['hi','想定 上限','num'],
+  ['出品・売却'],
+  ['listPrice','出品価格','num'],['listDate','出品日','date'],['soldPrice','売却価格','num'],['soldDate','売却日','date'],['soldCh','売却販路','ch'],['soldFee','実際の手数料（空欄＝販路の率で計算）','num'],
+  ['メモ'],
+  ['tags','タグ','text'],['memo','メモ','area']
+];
+let EDIT=null;
+function openSheet(title,html){$('#shT').textContent=title;$('#shB').innerHTML=html;$('#sheet').hidden=false;$('#shB').scrollTop=0}
+function closeSheet(){$('#sheet').hidden=true;EDIT=null}
+function openItem(id,prefill){
+  const it=id?getItem(id):null;if(id&&!it){toast('商品が見つかりません');return}
+  EDIT=it?JSON.parse(JSON.stringify(it)):newItem(prefill||{});EDIT._isNew=!it;
+  drawEditor();
+}
+function drawEditor(){
+  const e=EDIT;let h='';
+  for(const f of FIELDS){
+    if(f.length===1){h+=`<div class="sec">${esc(f[0])}</div>`;continue}
+    const [k,l,t]=f;let v=e[k]??'';if(Array.isArray(v))v=v.join(',');let inp;
+    if(t==='st')inp=`<select data-f="${k}">${Object.entries(ST).map(([a,b])=>`<option value="${a}"${e.st===a?' selected':''}>${b}</option>`).join('')}</select>`;
+    else if(t==='ch')inp=`<select data-f="${k}"><option value="">—</option>${CH.map(c=>`<option value="${c}"${chKey(v)===c&&v!==''?' selected':''}>${esc(S.settings.ch[c].name)}</option>`).join('')}</select>`;
+    else if(t==='area')inp=`<textarea data-f="${k}">${esc(v)}</textarea>`;
+    else if(t==='date'){const ok=v===''||/^\d{4}-\d{2}-\d{2}$/.test(v);inp=`<input data-f="${k}" type="${ok?'date':'text'}" value="${esc(v)}">`}
+    else inp=`<input data-f="${k}" ${t==='num'?'inputmode="numeric"':t==='tel'?'inputmode="numeric"':''} value="${esc(v)}">`;
+    h+=`<div class="fld"><label>${esc(l)}</label>${inp}</div>`;
+  }
+  // 付属品
+  const acc=e.acc||{};
+  h+=`<div class="sec">付属品チェック（タップで 未確認→あり→なし）</div><div class="tri">${ACC.map(([k,l])=>{const s=acc[k]||'';return`<button data-act="accTap" data-k="${k}" class="${s}">${s==='yes'?'✓':s==='no'?'✕':'・'} ${l}${s==='no'&&num(S.settings.acc[k])?` -${S.settings.acc[k]}%`:''}</button>`}).join('')}</div>
+  <div class="note" style="margin-top:4px">「なし」の項目は設定の割引率で想定売価を下げます。</div>`;
+  // 相場
+  const qs=(e.quotes||[]).slice().reverse();
+  h+=`<div class="sec">この商品の相場（${qs.length}件・作品単位で共有されます）</div>
+  <div class="grid3"><div class="fld"><label>価格</label><input id="nqP" inputmode="numeric"></div>
+  <div class="fld"><label>状況</label><select id="nqS"><option value="sold">売り切れ</option><option value="listing">出品中</option></select></div>
+  <div class="fld"><label>販路</label><select id="nqC">${CH.map(c=>`<option value="${c}">${esc(S.settings.ch[c].name)}</option>`).join('')}</select></div></div>
+  <div class="grid2"><div class="fld"><label>状態</label><input id="nqD" placeholder="目立った傷なし 等"></div><div class="fld"><label>確認日</label><input id="nqT" type="date" value="${today()}"></div></div>
+  <div class="btns"><button class="btn" data-act="addQuote">相場を追加</button><button class="btn" data-act="csvForEdit">相場CSVを取り込む</button></div>
+  <div style="margin-top:8px">${qs.slice(0,80).map(q=>`<div class="qrow"><span>${q.status==='sold'?'売切':q.status==='listing'?'出品中':'不明'}・${esc(q.ch&&q.ch!=='o'?S.settings.ch[q.ch].name:q.src||'')}・${esc(q.cond||'')}<br><span class="mut">${esc(q.title||'')}</span></span><span class="num">${yenT(q.price)}<br><span class="mut">${esc(q.date||'')}</span></span></div>`).join('')}${qs.length>80?`<div class="note">ほか${qs.length-80}件</div>`:''}</div>`;
+  const extra=Object.keys(e).filter(k=>!FIELDS.some(f=>f[0]===k)&&!['id','quotes','acc','created','_isNew','cover'].includes(k));
+  if(extra.length)h+=`<div class="note" style="margin-top:10px">その他の保存項目（表示のみ・そのまま保持）：${esc(extra.join(', '))}</div>`;
+  h+=`<div class="btns" style="margin:16px 0"><button class="btn pri" data-act="saveItem">保存</button><button class="btn" data-act="judgeItem">保存して判定を見る</button>${e._isNew?'':`<button class="btn dng" data-act="delItem">削除</button>`}</div>`;
+  openSheet(e._isNew?'新規商品':(e.name||'商品'),h);
+}
+function readEditor(){
+  document.querySelectorAll('#shB [data-f]').forEach(el=>{const k=el.dataset.f;const def=FIELDS.find(f=>f[0]===k);let v=el.value;
+    if(def&&def[2]==='num'){v=v.trim()===''?'':(isFinite(num(v))?num(v):v)}if(Array.isArray(EDIT[k]))v=v.split(/[,、]/).map(x=>x.trim()).filter(Boolean);EDIT[k]=v});
+}
+function saveEditor(){
+  readEditor();const e=EDIT;if(!String(e.name||'').trim()&&!String(e.code||'').trim()){toast('商品名かISBNを入力してください');return null}
+  if(e.st==='sold'&&!e.soldDate)e.soldDate=today();if(e.st==='listed'&&!e.listDate)e.listDate=today();
+  const isNew=e._isNew;delete e._isNew;e.updated=new Date().toISOString();
+  if(isNew)S.items.unshift(e);else{const i=S.items.findIndex(x=>String(x.id)===String(e.id));if(i>=0)S.items[i]=e;else S.items.unshift(e)}
+  save();toast('保存しました');return e;
+}
+
+/* ---------- 集計 ---------- */
+function inPer(d,per){const dt=pd(d);if(!dt)return per==='all';const n=new Date();
+  if(per==='all')return true;if(per==='30')return daysAgo(dt)<=30;
+  if(per==='month')return dt.getFullYear()===n.getFullYear()&&dt.getMonth()===n.getMonth();
+  if(per==='last'){const l=new Date(n.getFullYear(),n.getMonth()-1,1);return dt.getFullYear()===l.getFullYear()&&dt.getMonth()===l.getMonth()}
+  if(per==='year')return dt.getFullYear()===n.getFullYear();return true}
+function statsHTML(){
+  const per=UI.per;const sold=S.items.filter(i=>i.st==='sold'&&inPer(i.soldDate||i.date,per));
+  let sales=0,prof=0,cnt=0,days=[];const byS={},byG={};
+  for(const it of sold){const p=soldProfit(it);const sp=num(it.soldPrice??it.sp);if(!isFinite(p))continue;cnt++;sales+=sp;prof+=p;
+    const d1=pd(it.date),d2=pd(it.soldDate);if(d1&&d2)days.push((d2-d1)/864e5);
+    for(const [m,k] of [[byS,it.store||'（店舗未入力）'],[byG,it.genre||'（ジャンル未入力）']]){m[k]=m[k]||{n:0,s:0,p:0};m[k].n++;m[k].s+=sp;m[k].p+=p}}
+  const stock=S.items.filter(i=>i.st==='stock'||i.st==='listed');const stockCost=stock.reduce((s,i)=>s+(num(i.cost)||0),0);
+  const un=S.items.filter(i=>i.st==='listed'&&daysAgo(i.listDate||i.date)>num(S.settings.unsoldDays)).sort((a,b)=>daysAgo(b.listDate||b.date)-daysAgo(a.listDate||a.date));
+  const re=recheckList();
+  const tbl=(m)=>{const ks=Object.keys(m).sort((a,b)=>m[b].p-m[a].p);return ks.length?`<table><tr><th></th><th>件数</th><th>利益</th><th>利益率</th></tr>${ks.map(k=>`<tr><td style="white-space:normal">${esc(k)}</td><td class="num">${m[k].n}</td><td class="num">${yenT(m[k].p)}</td><td class="num">${pct(m[k].p/m[k].s)}</td></tr>`).join('')}</table>`:'<div class="note">データなし</div>'};
+  return `<div class="fchips">${[['month','今月'],['last','先月'],['30','直近30日'],['year','今年'],['all','全期間']].map(([k,l])=>`<button class="${per===k?'on':''}" data-act="per" data-v="${k}">${l}</button>`).join('')}</div>
+  <div class="kpis"><div class="kpi"><label>利益合計</label><b>${yen(prof)}</b></div><div class="kpi"><label>売上</label><b>${yen(sales)}</b></div>
+  <div class="kpi"><label>売却数／平均利益率</label><b class="num">${cnt}</b> 件・<span class="num">${pct(sales?prof/sales:NaN)}</span></div>
+  <div class="kpi"><label>平均在庫日数</label><b class="num">${days.length?(days.reduce((a,b)=>a+b,0)/days.length).toFixed(1):'—'}</b> 日</div>
+  <div class="kpi"><label>在庫（仕入済＋出品中）</label><b class="num">${stock.length}</b> 冊</div><div class="kpi"><label>在庫の仕入額</label><b>${yen(stockCost)}</b></div></div>
+  <div class="sec">店舗別</div><div class="card">${tbl(byS)}</div>
+  <div class="sec">ジャンル別</div><div class="card">${tbl(byG)}</div>
+  <div class="sec">売れ残り・値下げ候補（出品から${esc(S.settings.unsoldDays)}日超）${un.length}件</div>
+  <div class="list">${un.slice(0,50).map(it=>`<div class="it" data-act="openItem" data-id="${esc(it.id)}">${thumb(it)}<div class="m"><div class="t">${esc(it.name)}</div><div class="s">出品${daysAgo(it.listDate||it.date)}日・出品価格 ${yenT(num(it.listPrice))}</div></div></div>`).join('')||'<div class="note">ありません</div>'}</div>
+  <div class="sec">再調査リスト（相場の鮮度低下）${re.length}件</div>
+  <div class="list">${re.slice(0,50).map(({it,a})=>`<div class="it" data-act="openItem" data-id="${esc(it.id)}">${thumb(it)}<div class="m"><div class="t">${esc(it.name)}</div><div class="s">最新売り切れ ${a.st.latest?ymd(a.st.latest):'日付不明'}</div></div></div>`).join('')||'<div class="note">ありません</div>'}</div>`;
+}
+
+/* ---------- 設定 ---------- */
+function setHTML(){
+  const s=S.settings;const size=new Blob([JSON.stringify(S)]).size;const qn=S.items.reduce((a,i)=>a+(i.quotes||[]).length,0);
+  const inp=(path,val,attrs='')=>`<input data-set="${path}" value="${esc(val)}" ${attrs}>`;
+  return `<div class="sec">判定</div><div class="card">
+  <div class="grid2"><div class="fld"><label>目標利益率（%）</label>${inp('target',s.target,'inputmode="decimal"')}</div>
+  <div class="fld"><label>判定モード</label><select data-set="mode"><option value="cons"${s.mode==='cons'?' selected':''}>保守的（底値基準）</option><option value="std"${s.mode==='std'?' selected':''}>標準（中央値基準）</option></select></div>
+  <div class="fld"><label>ばらつき警告（高値÷底値 倍）</label>${inp('disp',s.disp,'inputmode="decimal"')}</div>
+  <div class="fld"><label>鮮度低下とみなす日数</label>${inp('fresh',s.fresh,'inputmode="numeric"')}</div>
+  <div class="fld"><label>売却済みの重複警告（直近N日）</label>${inp('dupDays',s.dupDays,'inputmode="numeric"')}</div>
+  <div class="fld"><label>売れ残りとみなす出品日数</label>${inp('unsoldDays',s.unsoldDays,'inputmode="numeric"')}</div>
+  <div class="fld"><label>採用する販路</label><select data-set="pick"><option value="best"${s.pick==='best'?' selected':''}>最も上限が高い販路</option><option value="main"${s.pick==='main'?' selected':''}>主販路に固定</option></select></div>
+  <div class="fld"><label>主販路</label><select data-set="main">${CH.map(c=>`<option value="${c}"${s.main===c?' selected':''}>${esc(s.ch[c].name)}</option>`).join('')}</select></div></div>
+  <div class="fld"><label>今日の仕入店舗（購入登録時に記録）</label>${inp('store',s.store)}</div>
+  <label class="row" style="font-size:14px"><input type="checkbox" data-set="autoQueue" ${s.autoQueue?'checked':''}> スキャンするたびカゴへ自動追加</label>
+  <div class="note" style="margin-top:6px">判定基準：◎ 利益率が目標＋15ポイント以上かつ売り切れ3件以上（鮮度低下時は○）／○ 目標以上／△ 利益は出るが目標未満、またはばらつき大・価格帯混在・欠巻あり／✕ 利益が出ない。</div></div>
+  <div class="sec">手数料・送料（初期値は目安です。ご自身の実績値に直してください）</div><div class="card">
+  <table><tr><th>販路</th><th>使う</th><th>手数料%</th><th>送料円</th></tr>${CH.map(c=>`<tr><td>${esc(s.ch[c].name)}</td><td><input type="checkbox" data-set="ch.${c}.on" ${s.ch[c].on?'checked':''}></td><td><input class="inline-in" style="width:64px" inputmode="decimal" data-set="ch.${c}.fee" value="${esc(s.ch[c].fee)}"></td><td><input class="inline-in" style="width:72px" inputmode="numeric" data-set="ch.${c}.ship" value="${esc(s.ch[c].ship)}"></td></tr>`).join('')}</table>
+  <div class="grid2" style="margin-top:8px"><div class="fld"><label>梱包費（円）</label>${inp('pack',s.pack,'inputmode="numeric"')}</div><div class="fld"><label>その他費用・仕入送料（円）</label>${inp('other',s.other,'inputmode="numeric"')}</div></div></div>
+  <div class="sec">付属品が「なし」のときの割引率（%）</div><div class="card"><div class="grid3">${ACC.map(([k,l])=>`<div class="fld"><label>${l}</label>${inp('acc.'+k,s.acc[k],'inputmode="numeric"')}</div>`).join('')}</div></div>
+  <div class="sec">リンクボタン（{title} {isbn} {jan} {author} が置き換わります）</div><div class="card">
+  ${S.links.map((l,i)=>`<div class="fld"><div class="row"><input data-link="${i}" data-k="name" value="${esc(l.name)}" style="flex:1"><button class="btn sm" data-act="linkUp" data-i="${i}">↑</button><button class="btn sm dng" data-act="linkDel" data-i="${i}">削除</button></div><input data-link="${i}" data-k="url" value="${esc(l.url)}" style="margin-top:4px;font-size:12px"></div>`).join('')}
+  <div class="btns"><button class="btn" data-act="linkAdd">＋ボタンを追加</button><button class="btn" data-act="linkReset">初期のボタンに戻す</button></div>
+  <div class="note" style="margin-top:6px">リンクは外部サイトを開くだけで、データの自動取得はしません。</div></div>
+  <div class="sec">データ</div><div class="card sum">
+  商品 <b>${S.items.length}</b> 件／相場 <b>${qn}</b> 件／カゴ <b>${S.queue.length}</b> 件<br>
+  使用量 約 <b>${size>1048576?(size/1048576).toFixed(2)+' MB':(size/1024).toFixed(1)+' KB'}</b>（iPhoneのSafariは1サイトあたり約5MBが目安）<br>
+  前回のバックアップ：<b>${S.meta.lastBackup?esc(String(S.meta.lastBackup).slice(0,16).replace('T',' ')):'なし'}</b><br>
+  保存キー：<span class="num">${KEY}</span>（SedoScope本体のデータとは別）
+  <div class="btns" style="margin-top:10px"><button class="btn pri" data-act="doBackup">バックアップを書き出す</button><button class="btn" data-act="copyBackup">バックアップをコピー</button><button class="btn" data-act="restoreOpen">バックアップから復元</button></div>
+  <div class="btns" style="margin-top:8px"><button class="btn" data-act="sedoOpen">SedoScopeのデータを取り込む</button><button class="btn" data-act="csvOpen">相場CSVを取り込む</button></div>
+  <div class="btns" style="margin-top:8px"><button class="btn dng" data-act="wipe">すべてのデータを初期化</button></div></div>
+  <div class="note" style="margin:12px 2px">SSS v${APP_VER}（${APP_DATE}）／外部通信は openBD（ISBNの書誌照会）のみ。</div>`;
+}
+
+/* ---------- バックアップ ---------- */
+function backupJSON(){return JSON.stringify({app:'SSS',key:KEY,ver:APP_VER,exportedAt:new Date().toISOString(),data:S})}
+function stamp(){const d=new Date();return ymd(d).replace(/-/g,'')+'_'+String(d.getHours()).padStart(2,'0')+String(d.getMinutes()).padStart(2,'0')}
+function doBackup(){
+  S.meta.lastBackup=new Date().toISOString();const txt=backupJSON();save();
+  const blob=new Blob([txt],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`sss_backup_${stamp()}.json`;
+  document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1500);
+  toast('バックアップを書き出しました（「ファイル」アプリに保存されます）');render();
+}
+async function copyBackup(){try{S.meta.lastBackup=new Date().toISOString();await navigator.clipboard.writeText(backupJSON());save();toast('クリップボードにコピーしました。メモ等に貼り付けて保管してください');render()}catch(e){toast('コピーできませんでした')}}
+function fileOrTextHTML(id,accept,ph){return `<div class="fld"><label>ファイルを選ぶ</label><input type="file" id="${id}F" accept="${accept}"></div><div class="fld"><label>または中身を貼り付け</label><textarea id="${id}T" placeholder="${esc(ph)}" style="min-height:110px;font-family:var(--mono);font-size:12px"></textarea></div>`}
+async function readFT(id){const f=$('#'+id+'F');if(f&&f.files&&f.files[0])return await f.files[0].text();return ($('#'+id+'T')||{}).value||''}
+function restoreOpen(){
+  openSheet('バックアップから復元',`<div class="banner" style="margin:0 0 10px">⚠️ 復元すると、いまのSSSのデータはすべて置き換わります（全置換）。先に今のデータを書き出しておくと安心です。</div>
+  ${fileOrTextHTML('rs','.json,application/json,text/plain','SSSのバックアップJSON')}<button class="btn pri" data-act="restoreRun">復元する</button>`);
+}
+async function restoreRun(){
+  let o;try{o=JSON.parse(await readFT('rs'))}catch(e){toast('JSONを読み込めません');return}
+  const data=o&&o.app==='SSS'&&o.data?o.data:o;
+  if(!data||!Array.isArray(data.items)){toast('SSSのバックアップではありません');return}
+  if(data.set&&!data.settings&&!confirm('これはSedoScope形式のようです。「SedoScopeのデータを取り込む」を使うのがおすすめです。このまま復元しますか？'))return;
+  if(!confirm(`現在のデータ（商品${S.items.length}件）をすべて置き換えて、バックアップ（商品${data.items.length}件）に戻します。よろしいですか？`))return;
+  S=fixState(JSON.parse(JSON.stringify(data)));save();closeSheet();CUR=null;toast(`復元しました（商品${S.items.length}件）`);render();
+}
+function wipe(){
+  const t=prompt(`すべてのデータ（商品${S.items.length}件）を消去します。元に戻せません。\n消去する場合は「削除」と入力してください。`);
+  if(t!=='削除'){toast('初期化を中止しました');return}
+  localStorage.removeItem(KEY);S=defState();save();CUR=null;toast('初期化しました');render();
+}
+
+/* ---------- SedoScope取り込み ---------- */
+const SEDO_KNOWN=['id','name','code','genre','pub','author','setk','vols','cond','cost','ship','pack','other','store','date','st','pm','py','pr','pa','lo','hi','quotes','memo','tags'];
+// SedoScope実データの項目 → SSSの項目（元の項目もそのまま残す）
+const SEDO_MAP={lc:'listCh',lp:'listPrice',ldate:'listDate',ac:'soldCh',ap:'soldPrice',adate:'soldDate',afee:'soldFee',aship:'soldShip',apack:'soldPack',aother:'soldOther'};
+const SEDO_KEEP={codeSrc:'コードの入力元',created:'作成日時',updated:'更新日時',src:'登録方法',inSet:'所属セット',members:'セットの構成巻',ed:'版',shipm:'発送方法',pmlo:'メルカリ想定（下）',pmhi:'メルカリ想定（上）',fromId:'コピー元'};
+function applySedoSet(set){
+  if(!set||typeof set!=='object')return [];const S2=S.settings,done=[];
+  const n=v=>num(v);
+  if(isFinite(n(set.trate))){S2.target=n(set.trate);done.push(`目標利益率 ${S2.target}%`)}
+  for(const [k,c] of [['rm','m'],['ry','y'],['rr','r'],['ra','a']])if(isFinite(n(set[k]))){S2.ch[c].fee=n(set[k]);done.push(`${S2.ch[c].name}手数料 ${n(set[k])}%`)}
+  if(isFinite(n(set.ship))){for(const c of CH)S2.ch[c].ship=n(set.ship);done.push(`送料 ${n(set.ship)}円（全販路）`)}
+  if(isFinite(n(set.pack))){S2.pack=n(set.pack);done.push(`梱包費 ${S2.pack}円`)}
+  if(isFinite(n(set.other))){S2.other=n(set.other);done.push(`その他費用 ${S2.other}円`)}
+  if(isFinite(n(set.stale))){S2.fresh=n(set.stale);done.push(`鮮度 ${S2.fresh}日`)}
+  if(set.mainCh&&CH.includes(set.mainCh)){S2.main=set.mainCh;done.push(`主販路 ${S2.ch[set.mainCh].name}`)}
+  return done;
+}
+function sedoOpen(){
+  openSheet('SedoScopeのデータを取り込む',`<div class="note" style="margin-bottom:8px">SedoScopeで書き出したバックアップJSON（items／set／meta を含むもの）を読み込み、SSSの形式に変換して取り込みます。SedoScope本体のデータは変更しません。</div>
+  ${fileOrTextHTML('sd','.json,application/json,text/plain','SedoScopeのバックアップJSON')}
+  <div class="fld"><label>取り込み方法</label><select id="sdMode"><option value="merge">追加（マージ）：今のデータは消さない（おすすめ）</option><option value="replace">全置換：今のSSSのデータを消して入れ替える</option></select></div>
+  <label class="row" style="font-size:14px;margin-bottom:10px"><input type="checkbox" id="sdSet" checked> SedoScopeの設定（目標利益率・手数料・送料・梱包費）も引き継ぐ</label>
+  <button class="btn pri" data-act="sedoRun">取り込む</button><div id="sdSum" style="margin-top:12px"></div>`);
+}
+function parseSedo(txt){
+  let o=JSON.parse(txt);
+  if(o&&o.sedoscope_v1)o=typeof o.sedoscope_v1==='string'?JSON.parse(o.sedoscope_v1):o.sedoscope_v1;
+  if(o&&o.data&&!Array.isArray(o.items)){o=typeof o.data==='string'?JSON.parse(o.data):o.data}
+  if(Array.isArray(o))o={items:o};
+  if(!o||!Array.isArray(o.items))throw new Error('items が見つかりません');
+  return o;
+}
+function importSedo(src,mode,opt){
+  const fieldCount={},unknown={},stMap={};const conv=[];let qTotal=0,qBad=0;
+  for(const o of src.items){if(!o||typeof o!=='object')continue;const it=JSON.parse(JSON.stringify(o));
+    for(const k of Object.keys(o)){if(SEDO_KNOWN.includes(k)){if(o[k]!==''&&o[k]!=null)fieldCount[k]=(fieldCount[k]||0)+1}else unknown[k]=(unknown[k]||0)+1}
+    if(it.id===undefined||it.id===null||it.id==='')it.id=uid();
+    const ns=normSt(o.st);if(String(o.st)!==ns){it.st_orig=o.st;stMap[String(o.st)]=ns}it.st=ns;
+    const qs=Array.isArray(o.quotes)?o.quotes:[];it.quotes=[];
+    for(const q of qs){const n=normQuote(q);if(!n){qBad++;continue}qTotal++;if(!(n.price>0)||!n.status)qBad++;it.quotes.push(n)}
+    for(const [a,b] of Object.entries(SEDO_MAP))if(o[a]!==undefined&&o[a]!==''&&(it[b]===undefined||it[b]===''))it[b]=o[a];
+    it._from='sedoscope';it._imported=today();conv.push(it)}
+  // セット：巻範囲と手元の巻を構成巻から作る
+  const byId=new Map(conv.map(i=>[String(i.id),i]));let setN=0;
+  for(const it of conv){if(!/セット/.test(String(it.setk||''))&&!Array.isArray(it.members))continue;
+    if(!it.range&&it.vols){const r=String(it.vols).normalize('NFKC').replace(/[〜～~]/g,'-').replace(/巻/g,'').trim();if(/^\d+(-\d+)?$/.test(r))it.range=r}
+    if(!it.have&&Array.isArray(it.members)){const v=it.members.map(id=>byId.get(String(id))||getItem(id)).filter(Boolean).map(m=>num(m.vols)).filter(x=>x>0);if(v.length)it.have=v.join(',')}
+    if(it.range)setN++}
+  let added=0,skipped=0;
+  if(mode==='replace'){S.items=conv;added=conv.length}
+  else{const ids=new Set(S.items.map(i=>String(i.id)));for(const it of conv){if(ids.has(String(it.id))){skipped++;continue}S.items.push(it);ids.add(String(it.id));added++}}
+  if(src.set!==undefined)S.meta.legacySet=src.set;if(src.meta!==undefined)S.meta.legacyMeta=src.meta;
+  const setApplied=opt&&opt.applySet?applySedoSet(src.set):[];
+  const sum={setApplied,setN,at:new Date().toISOString(),kind:'sedoscope',mode,src:src.items.length,conv:conv.length,added,skipped,qTotal,qBad,fieldCount,unknown,stMap};
+  S.meta.imports=(S.meta.imports||[]).concat([{at:sum.at,kind:'sedoscope',mode,src:sum.src,added,skipped}]).slice(-30);
+  save();return sum;
+}
+function sedoSumHTML(s){
+  const fc=SEDO_KNOWN.map(k=>`<tr><td>${k}</td><td class="num">${s.fieldCount[k]||0}</td></tr>`).join('');
+  const uk=Object.keys(s.unknown).filter(k=>!SEDO_MAP[k]&&!SEDO_KEEP[k]);
+  const mp=Object.keys(s.unknown).filter(k=>SEDO_MAP[k]),kp=Object.keys(s.unknown).filter(k=>SEDO_KEEP[k]);
+  return `<div class="card sum"><b style="font-family:inherit">取り込み結果</b><br>
+  元データの商品 <b>${s.src}</b> 件 → 変換 <b>${s.conv}</b> 件／追加 <b>${s.added}</b> 件${s.mode==='merge'?`／同じIDが既にあるためスキップ <b>${s.skipped}</b> 件`:'（全置換）'}<br>
+  相場（quotes） <b>${s.qTotal}</b> 件を移行${s.qBad?`（うち価格または販売状況を読み取れないもの <b>${s.qBad}</b> 件：保持はしますが判定には使いません）`:''}<br>
+  ${Object.keys(s.stMap).length?`ステータス変換：${Object.entries(s.stMap).map(([a,b])=>`${esc(a)}→${ST[b]}`).join('、')}（元の値は st_orig に保持）<br>`:''}
+  移行できなかったフィールド：<b>なし</b>（全項目をそのまま保持）<br>
+  ${mp.length?`出品・売却の項目をSSSの項目へ対応付け：${mp.map(k=>`${esc(k)}→${SEDO_MAP[k]}`).join('、')}<br>`:''}
+  ${kp.length?`記録として保持（判定には使わない）：${kp.map(k=>esc(SEDO_KEEP[k])).join('、')}<br>`:''}
+  ${uk.length?`SSSが知らない項目（保持のみ）：${uk.map(k=>`${esc(k)}(${s.unknown[k]})`).join(', ')}<br>`:''}
+  ${s.setN?`セット ${s.setN}件：巻数と構成巻から「巻範囲」「手元の巻」を設定（欠巻チェック用）<br>`:''}
+  設定：${s.setApplied.length?`SedoScopeから引き継ぎ（${esc(s.setApplied.join('、'))}）`:'引き継いでいません'}。元の設定内容は変更せず保存
+  <div class="sec">主要フィールドの件数（値が入っている商品数）</div><table>${fc}</table></div>`;
+}
+
+/* ---------- 相場CSV ---------- */
+function parseCSV(text){
+  text=String(text).replace(/^﻿/,'');const rows=[];let row=[],f='',q=false;
+  for(let i=0;i<text.length;i++){const c=text[i];
+    if(q){if(c==='"'){if(text[i+1]==='"'){f+='"';i++}else q=false}else f+=c}
+    else if(c==='"')q=true;else if(c===','){row.push(f);f=''}
+    else if(c==='\n'||c==='\r'){if(c==='\r'&&text[i+1]==='\n')i++;row.push(f);rows.push(row);row=[];f=''}
+    else f+=c}
+  if(f!==''||row.length){row.push(f);rows.push(row)}
+  return rows.filter(r=>r.some(x=>String(x).trim()!==''));
+}
+function importCSV(text,targetId,newName,src){
+  const rows=parseCSV(text);if(!rows.length)throw new Error('CSVが空です');
+  const h=rows[0].map(x=>String(x).trim());let ix={n:h.indexOf('商品名'),p:h.indexOf('価格'),s:h.indexOf('販売状況'),c:h.indexOf('商品の状態')};let body=rows.slice(1);
+  if(ix.p<0){ix={n:0,p:1,s:2,c:3};body=rows}
+  let it=targetId?getItem(targetId):null;let created=false;
+  if(!it){const nm=(newName||'').trim()||String((body[0]||[])[ix.n]||'取り込み').slice(0,60);it=newItem({name:nm,st:'cand'});S.items.unshift(it);created=true}
+  it.quotes=it.quotes||[];const seen=new Set(it.quotes.map(qKey));let add=0,dup=0,bad=0;const d=today();
+  for(const r of body){const q=normQuote({title:ix.n>=0?r[ix.n]:'',price:r[ix.p],status:ix.s>=0?r[ix.s]:'',cond:ix.c>=0?r[ix.c]:'',src,date:d});q.imp='csv';
+    if(!(q.price>0)||!q.status){bad++;continue}const k=qKey(q);if(seen.has(k)){dup++;continue}seen.add(k);it.quotes.push(q);add++}
+  S.meta.imports=(S.meta.imports||[]).concat([{at:new Date().toISOString(),kind:'csv',item:it.id,src,add,dup,bad}]).slice(-30);
+  save();return{total:body.length,add,dup,bad,it,created};
+}
+function csvOpen(targetId,defName){
+  const opts=S.items.slice(0,400).map(i=>`<option value="${esc(i.id)}"${String(i.id)===String(targetId)?' selected':''}>${esc((i.name||'(無題)').slice(0,40))}${i.code?' ／'+esc(i.code):''}</option>`).join('');
+  openSheet('相場CSVを取り込む',`<div class="note" style="margin-bottom:8px">ヘッダ「商品名,価格,販売状況,商品の状態」のCSVを取り込みます。確認日は取り込んだ日として記録します。同じ内容（商品名・価格・販売状況・状態・販路が同じ）の行は重複として除外します。</div>
+  <div class="fld"><label>取り込み先</label><select id="cvT"><option value="">＋新しい候補として作る</option>${opts}</select></div>
+  <div class="fld"><label>新しく作る場合の商品名</label><input id="cvN" value="${esc(defName||'')}" placeholder="空欄ならCSVの1行目の商品名"></div>
+  <div class="fld"><label>販路ソース</label><select id="cvS">${CH.map(c=>`<option value="${c}">${esc(S.settings.ch[c].name)}</option>`).join('')}</select></div>
+  ${fileOrTextHTML('cv','.csv,text/csv,text/plain','商品名,価格,販売状況,商品の状態\n…')}
+  <button class="btn pri" data-act="csvRun">取り込む</button><div id="cvSum" style="margin-top:12px"></div>`);
+}
+
+/* ============================================================
+   バーコード読み取り（BarcodeDetector があれば使い、なければ内蔵のEAN-13解読）
+   ============================================================ */
+const LP=[[3,2,1,1],[2,2,2,1],[2,1,2,2],[1,4,1,1],[1,1,3,2],[1,2,3,1],[1,1,1,4],[1,3,1,2],[1,2,1,3],[3,1,1,2]];
+const GP=LP.map(p=>p.slice().reverse());
+const PAR=['LLLLLL','LLGLGG','LLGGLG','LLGGGL','LGLLGG','LGGLLG','LGGGLL','LGLGLG','LGLGGL','LGGLGL'];
+function matchDigit(R,o,left){
+  const w=[R[o],R[o+1],R[o+2],R[o+3]],sum=w[0]+w[1]+w[2]+w[3];const v=w.map(x=>x*7/sum);let best=null,be=99;
+  const test=(p,d,g)=>{let e=0;for(let k=0;k<4;k++)e+=Math.abs(v[k]-p[k]);if(e<be){be=e;best={d,g}}};
+  LP.forEach((p,d)=>test(p,d,false));if(left)GP.forEach((p,d)=>test(p,d,true));
+  return be<1.5?best:null;
+}
+function tryEAN(R,s){
+  let W=0;for(let i=0;i<59;i++)W+=R[s+i];const m=W/95;
+  for(const i of [0,1,2,27,28,29,30,31,56,57,58]){const g=R[s+i]/m;if(g<0.35||g>2.2)return null}
+  if(s>0&&R[s-1]<m*2.5)return null;
+  const dg=[];let par='';
+  for(let d=0;d<6;d++){const r=matchDigit(R,s+3+d*4,true);if(!r)return null;dg.push(r.d);par+=r.g?'G':'L'}
+  for(let d=0;d<6;d++){const r=matchDigit(R,s+32+d*4,false);if(!r)return null;dg.push(r.d)}
+  const f=PAR.indexOf(par);if(f<0)return null;const code=f+dg.join('');return ean13ok(code)?code:null;
+}
+function decodeRow(L){
+  const n=L.length,W=Math.max(10,n>>4);const pre=new Float64Array(n+1);for(let i=0;i<n;i++)pre[i+1]=pre[i]+L[i];
+  let mn=255,mx=0;for(let i=0;i<n;i++){if(L[i]<mn)mn=L[i];if(L[i]>mx)mx=L[i]}if(mx-mn<40)return null;
+  const gmid=(mn+mx)/2;
+  const thr=[i=>gmid,
+    i=>{const a=Math.max(0,i-W),b=Math.min(n,i+W);let lo=255,hi=0;for(let j=a;j<b;j+=2){if(L[j]<lo)lo=L[j];if(L[j]>hi)hi=L[j]}return hi-lo<(mx-mn)*0.3?gmid:(lo+hi)/2},
+    i=>{const a=Math.max(0,i-W),b=Math.min(n,i+W);return Math.min((pre[b]-pre[a])/(b-a),gmid+(mx-mn)*0.25)}];
+  for(const T of thr){
+    const bits=new Uint8Array(n);for(let i=0;i<n;i++)bits[i]=L[i]<T(i)?1:0;
+    const R=[],C=[];let c=bits[0],len=0;for(let i=0;i<n;i++){if(bits[i]===c)len++;else{R.push(len);C.push(c);c=bits[i];len=1}}R.push(len);C.push(c);
+    for(let s=0;s+59<=R.length;s++){if(C[s]!==1)continue;const r=tryEAN(R,s);if(r)return r}
+  }
+  return null;
+}
+const cv=document.createElement('canvas');let cx=null;
+function decodeImageData(img,W,H){
+  for(let k=1;k<16;k++){const y=Math.round(H*k/16);const L=new Float32Array(W);
+    for(let x=0;x<W;x++){let s=0;for(const dy of [-1,0,1]){const yy=Math.min(H-1,Math.max(0,y+dy));const i=(yy*W+x)*4;s+=img[i]*.299+img[i+1]*.587+img[i+2]*.114}L[x]=s/3}
+    let r=decodeRow(L);if(!r)r=decodeRow(L.slice().reverse());if(r&&okScanCode(r))return r}
+  return null;
+}
+function decodeFrame(v){
+  const vw=v.videoWidth,vh=v.videoHeight;if(!vw)return null;const W=Math.min(1000,vw),sc=W/vw,H=Math.round(vh*0.5*sc);
+  cv.width=W;cv.height=H;cx=cx||cv.getContext('2d',{willReadFrequently:true});cx.drawImage(v,0,vh*0.25,vw,vh*0.5,0,0,W,H);
+  return decodeImageData(cx.getImageData(0,0,W,H).data,W,H);
+}
+const Scan={on:false,stream:null,det:null,last:'',lastT:0,cand:'',candN:0,timer:null,ac:null};
+function beep(){try{Scan.ac=Scan.ac||new (window.AudioContext||window.webkitAudioContext)();const o=Scan.ac.createOscillator(),g=Scan.ac.createGain();o.frequency.value=1800;g.gain.value=.08;o.connect(g);g.connect(Scan.ac.destination);o.start();o.stop(Scan.ac.currentTime+.08)}catch(e){}}
+async function startScan(){
+  if(Scan.on)return;
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){toast('この環境ではカメラを使えません。ISBNを入力してください');return}
+  try{Scan.ac=Scan.ac||new (window.AudioContext||window.webkitAudioContext)();Scan.ac.resume&&Scan.ac.resume()}catch(e){}
+  const w=$('#camWrap');w.innerHTML=`<div id="cam"><video playsinline muted autoplay></video><div class="guide"></div><div class="hint">バーコードを赤線に合わせて横向きに（連続読み取り中）</div></div>`;
+  const video=w.querySelector('video');
+  try{Scan.stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}},audio:false})}
+  catch(e){w.innerHTML='';toast('カメラを起動できません（'+e.name+'）。設定でカメラを許可するか、ISBNを入力してください');return}
+  video.srcObject=Scan.stream;try{await video.play()}catch(e){}
+  Scan.det=null;
+  if('BarcodeDetector' in window){try{const f=await BarcodeDetector.getSupportedFormats();if(f.includes('ean_13'))Scan.det=new BarcodeDetector({formats:['ean_13']})}catch(e){}}
+  Scan.on=true;renderPad();loop(video);
+}
+function stopScan(){Scan.on=false;clearTimeout(Scan.timer);if(Scan.stream){Scan.stream.getTracks().forEach(t=>t.stop());Scan.stream=null}const w=$('#camWrap');if(w)w.innerHTML='';if(UI.tab==='look'&&$('#pad').innerHTML)renderPad()}
+async function loop(video){
+  if(!Scan.on)return;let code=null;
+  try{if(Scan.det){const r=await Scan.det.detect(video);for(const b of r){if(okScanCode(b.rawValue)){code=b.rawValue;break}}}else code=decodeFrame(video)}catch(e){}
+  if(code)onCode(code);Scan.timer=setTimeout(()=>loop(video),Scan.det?150:80);
+}
+function onCode(code){
+  if(!Scan.det){if(code===Scan.cand)Scan.candN++;else{Scan.cand=code;Scan.candN=1}if(Scan.candN<2)return}
+  const t=Date.now();if(code===Scan.last&&t-Scan.lastT<3000)return;Scan.last=code;Scan.lastT=t;
+  beep();const c=$('#cam');if(c){c.classList.add('hit');setTimeout(()=>c.classList.remove('hit'),350)}
+  lookupCode(code,{auto:true});
+}
+
+/* ============================================================
+   操作
+   ============================================================ */
+function registerCur(st){
+  if(!CUR||(!CUR.code&&!CUR.title)){toast('先に本を調べてください');return}
+  const p=CUR.price===''?'':Number(CUR.price);
+  if(st==='stock'&&p===''){toast('店頭価格を入力してください');return}
+  const ex=CUR.itemId?getItem(CUR.itemId):null;
+  if(ex&&ex.st==='cand'&&st==='stock'){Object.assign(ex,{st:'stock',cost:p,date:today(),store:S.settings.store||ex.store||''});save();toast('候補を「仕入済」にしました');renderResult();return}
+  if(st==='stock'){const d=dupInfo(CUR.code).filter(x=>x.lv==='bad');if(d.length&&!confirm('在庫・出品中に同じISBNがあります。それでも仕入れ登録しますか？'))return}
+  const it=newItem({name:CUR.title||CUR.code,code:CUR.code,author:CUR.author||'',pub:CUR.pub||'',cover:CUR.cover||'',st,cost:p,store:st==='stock'?(S.settings.store||''):'',
+    work:ex&&ex.work||'',genre:ex&&ex.genre||'',memo:st==='cand'&&p!==''?`店頭価格 ${p}円（${today()}）`:''});
+  S.items.unshift(it);save();CUR.itemId=it.id;toast(st==='stock'?'仕入済として登録しました':'候補に保存しました');renderResult();
+}
+const ACT={
+  showVer(){alert('SSS v'+APP_VER+'（'+APP_DATE+'）\n\n'+CHANGELOG.join('\n\n'))},
+  closeSheet(){closeSheet();render()},
+  key(b){if(!CUR){toast('先に本を調べてください');return}const k=b.dataset.k;let v=String(CUR.price??'');
+    if(k==='C')v='';else if(k==='B')v=v.slice(0,-1);else if(v.length<7)v=(v==='0'?'':v)+k;CUR.price=v;updatePV();renderResult()},
+  padToggle(){UI.padOpen=!UI.padOpen;renderPad()},
+  scanToggle(){Scan.on?stopScan():startScan()},
+  toCart(){addQueue(false)},
+  regStock(){registerCur('stock')},
+  regCand(){registerCur('cand')},
+  doSearch(){doSearch()},
+  setManTitle(){const t=($('#manTitle').value||'').trim();if(!t)return;CUR.title=t;renderResult()},
+  pickItem(b){const it=getItem(b.dataset.id);if(!it)return;CUR={code:normCode(it.code),itemId:it.id,title:it.name,author:it.author||'',pub:it.pub||'',cover:itemCover(it),price:''};$('#srchRes').innerHTML='';renderResult();updatePV();focusRes()},
+  pickTitle(b){CUR={code:'',itemId:null,title:b.dataset.t,author:'',pub:'',cover:'',price:''};$('#srchRes').innerHTML='';renderResult();updatePV();focusRes()},
+  openItem(b,e){e&&e.preventDefault();openItem(b.dataset.id)},
+  csvFor(){if(!CUR)return;csvOpen(CUR.itemId,CUR.title)},
+  quoteFor(){if(!CUR)return;if(CUR.itemId)openItem(CUR.itemId);else{openItem(null,{name:CUR.title||CUR.code,code:CUR.code,author:CUR.author,pub:CUR.pub,cover:CUR.cover})}},
+  cartSort(b){UI.cartSort=b.dataset.v;render()},
+  cartOpen(b){const q=S.queue.find(x=>x.id===b.dataset.id);if(!q)return;setTab('look');CUR={code:q.code,itemId:q.itemId,title:q.title,author:q.author,pub:q.pub,cover:q.cover,price:q.price===''?'':String(q.price)};renderResult();updatePV();focusRes()},
+  qDel(b){S.queue=S.queue.filter(x=>x.id!==b.dataset.id);save();render()},
+  qClear(){if(confirm('カゴを空にしますか？')){S.queue=[];save();render()}},
+  buyPicks(){const rows=cartRows();const {pick}=cartPicks(rows);buyRows([...pick])},
+  buyAll(){if(confirm(`カゴの${S.queue.length}冊を購入登録しますか？`))buyRows(S.queue.map(q=>q.id))},
+  listF(b){UI.listF=b.dataset.v;UI.listN=150;render()},
+  more(){UI.listN+=150;render()},
+  newItem(){openItem(null,{})},
+  accTap(b){readEditor();const k=b.dataset.k;EDIT.acc=EDIT.acc||{};const s=EDIT.acc[k]||'';EDIT.acc[k]=s===''?'yes':s==='yes'?'no':'';drawEditorKeep()},
+  addQuote(){readEditor();const p=num($('#nqP').value);if(!(p>0)){toast('価格を入力してください');return}
+    EDIT.quotes=EDIT.quotes||[];EDIT.quotes.push(normQuote({price:p,status:$('#nqS').value,src:$('#nqC').value,cond:$('#nqD').value,date:$('#nqT').value||today(),title:EDIT.name,imp:'manual'}));drawEditorKeep();toast('追加しました（保存を押すと確定）')},
+  csvForEdit(){const e=saveEditor();if(!e)return;csvOpen(e.id,e.name)},
+  saveItem(){if(saveEditor()){closeSheet();render()}},
+  judgeItem(){const e=saveEditor();if(!e)return;closeSheet();setTab('look');CUR={code:normCode(e.code),itemId:e.id,title:e.name,author:e.author||'',pub:e.pub||'',cover:itemCover(e),price:''};renderResult();updatePV();focusRes()},
+  delItem(){if(!EDIT||!confirm(`「${EDIT.name}」を削除しますか？（相場${(EDIT.quotes||[]).length}件も消えます）`))return;S.items=S.items.filter(x=>String(x.id)!==String(EDIT.id));save();closeSheet();toast('削除しました');render()},
+  per(b){UI.per=b.dataset.v;render()},
+  linkAdd(){S.links.push({id:uid(),name:'新しいボタン',url:'https://www.google.com/search?q={title}'});save();render()},
+  linkDel(b){const i=+b.dataset.i;if(confirm(`「${S.links[i].name}」を削除しますか？`)){S.links.splice(i,1);save();render()}},
+  linkUp(b){const i=+b.dataset.i;if(i>0){const t=S.links[i];S.links[i]=S.links[i-1];S.links[i-1]=t;save();render()}},
+  linkReset(){if(confirm('リンクボタンを初期状態に戻しますか？')){S.links=DEF_LINKS.map(x=>({...x}));save();render()}},
+  doBackup(){doBackup()},copyBackup(){copyBackup()},restoreOpen(){restoreOpen()},restoreRun(){restoreRun()},wipe(){wipe()},
+  sedoOpen(){sedoOpen()},
+  async sedoRun(){let src;try{src=parseSedo(await readFT('sd'))}catch(e){toast('読み込めません：'+e.message);return}
+    const mode=$('#sdMode').value;if(mode==='replace'&&!confirm(`SSSの今のデータ（商品${S.items.length}件）を消して、SedoScopeのデータ（${src.items.length}件）に入れ替えます。よろしいですか？`))return;
+    const sum=importSedo(src,mode,{applySet:$('#sdSet').checked});$('#sdSum').innerHTML=sedoSumHTML(sum);toast(`${sum.added}件を取り込みました`)},
+  csvOpen(){csvOpen(null,'')},
+  async csvRun(){const txt=await readFT('cv');if(!txt.trim()){toast('CSVを選ぶか貼り付けてください');return}
+    let r;try{r=importCSV(txt,$('#cvT').value,$('#cvN').value,$('#cvS').value)}catch(e){toast(e.message);return}
+    $('#cvSum').innerHTML=`<div class="card sum">取り込み先：<b style="font-family:inherit">${esc(r.it.name)}</b>${r.created?'（新規作成）':''}<br>読み込んだ行 <b>${r.total}</b>／追加 <b>${r.add}</b>／重複除外 <b>${r.dup}</b>／読めない行 <b>${r.bad}</b></div>`;
+    if(CUR&&!CUR.itemId&&r.created&&workKey(r.it.name)===workKey(CUR.title))CUR.itemId=null;
+    toast(`${r.add}件を取り込みました`)}
+};
+function drawEditorKeep(){const y=$('#shB').scrollTop;drawEditor();$('#shB').scrollTop=y}
+
+document.addEventListener('click',e=>{
+  const t=e.target.closest('[data-tab]');if(t){setTab(t.dataset.tab);return}
+  const b=e.target.closest('[data-act]');if(!b)return;if(b.tagName==='INPUT')return;const f=ACT[b.dataset.act];if(f)f(b,e);
+});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&e.target.id==='q'){e.preventDefault();doSearch()}
+  if(e.key==='Enter'&&e.target.id==='manTitle'){e.preventDefault();ACT.setManTitle()}
+});
+document.addEventListener('input',e=>{
+  if(e.target.id==='lq'){UI.listQ=e.target.value;clearTimeout(UI.lqT);UI.lqT=setTimeout(()=>{const pos=e.target.selectionStart;render();const el=$('#lq');if(el){el.focus();try{el.setSelectionRange(pos,pos)}catch(_){}}},250)}
+});
+document.addEventListener('change',e=>{
+  const el=e.target;
+  if(el.dataset.set){const path=el.dataset.set.split('.');let o=S.settings;for(let i=0;i<path.length-1;i++)o=o[path[i]];
+    const k=path[path.length-1];let v=el.type==='checkbox'?el.checked:el.value;
+    if(el.type!=='checkbox'&&el.inputMode&&/numeric|decimal/.test(el.inputMode)&&k!=='budget'){const n=num(v);v=isFinite(n)?n:o[k]}
+    o[k]=v;save();if(UI.tab!=='look')render();else renderResult();return}
+  if(el.dataset.qprice){const q=S.queue.find(x=>x.id===el.dataset.qprice);if(q){const n=num(el.value);q.price=isFinite(n)?n:'';save();render()}return}
+  if(el.dataset.link!==undefined){const l=S.links[+el.dataset.link];if(l){l[el.dataset.k]=el.value;save()}return}
+});
+window.addEventListener('pagehide',()=>stopScan());
+document.addEventListener('visibilitychange',()=>{if(document.hidden)stopScan()});
+setTab('look');
+</script>
+</body>
+</html>
