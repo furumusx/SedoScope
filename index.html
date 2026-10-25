@@ -215,9 +215,10 @@ input[type="date"]{min-width:0;max-width:100%}
    データ: localStorage "sedoscope_s_v1"（SedoScope本体 "sedoscope_v1" とは別）
    外部通信: openBD ISBN照会のみ
    ============================================================ */
-const APP_VER='1.4.5';
+const APP_VER='1.4.6';
 const APP_DATE='2026-10-24';
 const CHANGELOG=[
+  'v1.4.6（2026-10-25）「BORUTO―ボルト― 3 ―TWO BLUE VORTEX―」のように巻数がタイトルの真ん中にある本を、同じ作品として扱えていなかった問題を直した。この形式でも単巻をセットとして束ねられるようになり、巻数の読み取りもできるようになった。',
   'v1.4.5（2026-10-25）一覧の絞り込みをシート方式にした。「絞り込み」ボタンから、ジャンル・出版社・状態に加えて仕入店舗・区分・仕入月でも絞り込める。適用中の条件はボタンの横に表示され、個別に外すこともできる。',
   'v1.4.4（2026-10-25）見やすさ重視で、表紙画像の表示をやめて全画面で「画像なし」に統一した（一覧・検索候補・集計リスト・調べる画面の見出し）。空の四角が消えた分、一覧のタイトルは2行まで表示するようにした。画像のデータ自体は消していないので、将来戻すこともできる。',
   'v1.4.3（2026-10-25）セットの編集画面で「束ねた単巻」の行をタップすると、その単巻の編集画面に移れるようにした（移動前に今の編集内容は自動で保存される）。日付などの入力欄が枠からはみ出す問題を、列の幅指定を変えて修正。内部管理用の項目が「その他の保存項目」に表示されないようにした。',
@@ -313,8 +314,9 @@ const isISBN=c=>/^97[89]\d{10}$/.test(c);
 /* ---------- 正規化 ---------- */
 function workKey(s){
   if(!s)return '';let t=String(s).normalize('NFKC').toLowerCase();
-  t=t.replace(/[【\[(（「『〈<][^】\])）」』〉>]*[】\])）」』〉>]/g,' ');
+  t=t.replace(/[【\[(（「『〈<][^】\])）」』〉>]*[】\])）」』〉>―—]/g,' ');
   t=t.replace(/全\s*\d+\s*巻|\d+\s*[-~〜～]\s*\d+\s*巻?|第?\s*\d+\s*巻|vol\.?\s*\d+/g,' ');
+  t=t.replace(/([\s―—])\d{1,3}(?=[\s―—]|$)/g,'$1');
   t=t.replace(/全巻|完結|セット|初版|帯付き?|チラシ付き?|特典付き?|美品|中古|コミックス?|漫画|まとめ売り?|送料無料|即購入可/g,' ');
   t=t.replace(/[\s・:：!！?？、。,.\-_~〜～\/／|｜+＋'"]+/g,'');
   t=t.replace(/\d+$/,'');
@@ -395,7 +397,7 @@ function parseVols(s){const set=new Set();String(s||'').normalize('NFKC').split(
   const m=p.match(/^(\d+)(?:[-~〜](\d+))?$/);if(!m)return;const a=+m[1],b=m[2]?+m[2]:a;if(Math.abs(b-a)>500)return;
   for(let i=Math.min(a,b);i<=Math.max(a,b);i++)set.add(i)});return set}
 function volOf(name){const t=String(name||'').normalize('NFKC');
-  const m=t.match(/第?\s*(\d+)\s*巻/)||t.match(/vol\.?\s*(\d+)/i)||t.match(/\s(\d{1,3})\s*$/);return m?+m[1]:null}
+  const m=t.match(/第?\s*(\d+)\s*巻/)||t.match(/vol\.?\s*(\d+)/i)||t.match(/\s(\d{1,3})\s*$/)||t.match(/[\s―—](\d{1,3})(?=[\s―—]|$)/);return m?+m[1]:null}
 function volCheck(it,pool){
   if(!it||!it.range)return null;const need=parseVols(it.range);if(!need.size)return null;
   let have,src;
