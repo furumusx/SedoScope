@@ -215,9 +215,10 @@ input[type="date"]{min-width:0;max-width:100%}
    データ: localStorage "sedoscope_s_v1"（SedoScope本体 "sedoscope_v1" とは別）
    外部通信: openBD ISBN照会のみ
    ============================================================ */
-const APP_VER='1.4.6';
+const APP_VER='1.4.7';
 const APP_DATE='2026-10-24';
 const CHANGELOG=[
+  'v1.4.7（2026-10-25）POSTAの売上記録から渡された売却情報を、確認画面で確かめてから「売却済み」として登録できるようにした（自動では反映しない）。',
   'v1.4.6（2026-10-25）「BORUTO―ボルト― 3 ―TWO BLUE VORTEX―」のように巻数がタイトルの真ん中にある本を、同じ作品として扱えていなかった問題を直した。この形式でも単巻をセットとして束ねられるようになり、巻数の読み取りもできるようになった。',
   'v1.4.5（2026-10-25）一覧の絞り込みをシート方式にした。「絞り込み」ボタンから、ジャンル・出版社・状態に加えて仕入店舗・区分・仕入月でも絞り込める。適用中の条件はボタンの横に表示され、個別に外すこともできる。',
   'v1.4.4（2026-10-25）見やすさ重視で、表紙画像の表示をやめて全画面で「画像なし」に統一した（一覧・検索候補・集計リスト・調べる画面の見出し）。空の四角が消えた分、一覧のタイトルは2行まで表示するようにした。画像のデータ自体は消していないので、将来戻すこともできる。',
@@ -254,7 +255,7 @@ function defSettings(){return{
       r:{name:'ラクマ',fee:10,ship:210,on:true},a:{name:'ヤフオク',fee:10,ship:210,on:true}},
   pack:30,other:0,main:'m',pick:'main',
   acc:{obi:10,cover:30,booklet:10,poster:5,other:0},
-  store:'',stores:[],budget:'',autoQueue:false
+  store:'',stores:[],budget:'',autoQueue:false,postaUrl:'https://furumusx.github.io/posta/',
 }}
 function defState(){return{schema:1,items:[],queue:[],biblio:{},settings:defSettings(),links:DEF_LINKS.map(x=>({...x})),
   meta:{created:new Date().toISOString(),lastBackup:null,imports:[]}}}
@@ -959,7 +960,7 @@ function drawEditor(){
   <div class="mt2">${qs.slice(0,80).map(q=>`<div class="qrow"><span>${q.status==='sold'?'売切':q.status==='listing'?'出品中':'不明'}・${esc(q.ch&&q.ch!=='o'?S.settings.ch[q.ch].name:q.src||'')}・${esc(q.cond||'')}<br><span class="mut">${esc(q.title||'')}</span></span><span class="num">${yenT(q.price)}<br><span class="mut">${esc(q.date||'')}</span></span></div>`).join('')}${qs.length>80?`<div class="note">ほか${qs.length-80}件</div>`:''}</div></div>`;
   const extra=Object.keys(e).filter(k=>!FIELDS.some(f=>f[0]===k)&&!['id','quotes','acc','created','_isNew','cover','autoBundle','inSet'].includes(k));
   if(extra.length)h+=`<div class="note mt3">その他の保存項目（表示のみ・そのまま保持）：${esc(extra.join(', '))}</div>`;
-  h+=`<div class="btns edfoot"><button class="btn pri" data-act="saveItem">保存</button><button class="btn" data-act="judgeItem">保存して判定を見る</button>${e._isNew?'':`<button class="btn dng" data-act="delItem">削除</button>`}</div>`;
+  h+=`<div class="btns edfoot"><button class="btn pri" data-act="saveItem">保存</button><button class="btn" data-act="judgeItem">保存して判定を見る</button><button class="btn" data-act="postaItem">POSTAで出品メモ</button>${e._isNew?'':`<button class="btn dng" data-act="delItem">削除</button>`}</div>`;
   openSheet(e._isNew?'新規商品':(e.name||'商品'),h);
 }
 function readEditor(){
@@ -1033,6 +1034,7 @@ function setHTML(){
   ${S.links.map((l,i)=>`<div class="fld"><div class="row"><input data-link="${i}" data-k="name" value="${esc(l.name)}" class="grow"><button class="btn sm" data-act="linkUp" data-i="${i}">↑</button><button class="btn sm dng" data-act="linkDel" data-i="${i}">削除</button></div><input data-link="${i}" data-k="url" value="${esc(l.url)}" class="mt1"></div>`).join('')}
   <div class="btns"><button class="btn" data-act="linkAdd">＋ボタンを追加</button><button class="btn" data-act="linkReset">初期のボタンに戻す</button></div>
   <div class="note mt2">リンクは外部サイトを開くだけで、データの自動取得はしません。</div></div>
+  <div class="sec">POSTA連携</div><div class="card"><div class="fld"><label>POSTAのURL</label>${inp('postaUrl',s.postaUrl)}</div></div>
   <div class="sec">データ</div><div class="card sum">
   商品 <b>${S.items.length}</b> 件／相場 <b>${qn}</b> 件／カゴ <b>${S.queue.length}</b> 件<br>
   使用量 約 <b>${size>1048576?(size/1048576).toFixed(2)+' MB':(size/1024).toFixed(1)+' KB'}</b>（iPhoneのSafariは1サイトあたり約5MBが目安）<br>
@@ -1326,6 +1328,16 @@ const ACT={
   delItem(){if(!EDIT||!confirm(`「${EDIT.name}」を削除しますか？（相場${(EDIT.quotes||[]).length}件も消えます）`))return;S.items=S.items.filter(x=>String(x.id)!==String(EDIT.id));save();closeSheet();toast('削除しました');render()},
   statsAxis(b){UI.statsAxis=b.dataset.v;render()},
   per(b){UI.per=b.dataset.v;render()},
+  postaItem(){const base=String(S.settings.postaUrl||'').trim();if(!base){toast('設定でPOSTAのURLを入力してください');return}
+    const e=saveEditor();if(!e)return;
+    const price=(e.listPrice!==''&&e.listPrice!=null)?e.listPrice:e.pm;
+    const ps=[['src','sss'],['sssId',e.id],['title',e.name],['work',e.work],['author',e.author],['pub',e.pub],['price',price],['cost',e.cost],['costship',e.other],['range',e.range],['setk',e.setk],['cond',e.cond],['code',e.code]]
+      .filter(([k,v])=>v!==undefined&&v!==null&&String(v)!=='').map(([k,v])=>k+'='+encodeURIComponent(String(v))).join('&');
+    location.href=base+(base.includes('?')?'&':'?')+ps},
+  postaSoldOk(){const P=POSTA_PENDING;POSTA_PENDING=null;const it=P&&getItem(P.id);if(!it){closeSheet();render();return}
+    it.st='sold';it.soldPrice=P.sp;it.soldDate=P.sd;if(P.ch)it.soldCh=P.ch;if(P.fee!==null)it.soldFee=P.fee;
+    save();closeSheet();render();toast('売却を登録しました')},
+  postaSoldCancel(){POSTA_PENDING=null;closeSheet();render()},
   storeAdd(){const v=($('#storeNew').value||'').trim();if(!v)return;S.settings.stores=S.settings.stores||[];if(!S.settings.stores.includes(v))S.settings.stores.push(v);save();render()},
   storeDel(b){S.settings.stores.splice(+b.dataset.i,1);save();render()},
   storeHarvest(){const used=[...new Set(S.items.map(i=>String(i.store||'')).filter(Boolean))];S.settings.stores=[...new Set([...(S.settings.stores||[]),...used])];if(S.settings.store&&!S.settings.stores.includes(S.settings.store))S.settings.stores.push(S.settings.store);save();render();toast('店舗を取り込みました')},
@@ -1375,6 +1387,29 @@ document.addEventListener('change',e=>{
 });
 window.addEventListener('pagehide',()=>stopScan());
 document.addEventListener('visibilitychange',()=>{if(document.hidden)stopScan()});
+/* ---------- POSTAからの売却登録（URL連携・確認してから反映） ---------- */
+let POSTA_PENDING=null;
+function postaSoldFromURL(){
+  let q;try{q=new URLSearchParams(location.search)}catch(e){return}
+  if(q.get('src')!=='posta'||q.get('act')!=='sold')return;
+  const clear=()=>{try{history.replaceState(null,'',location.pathname+location.hash)}catch(e){}};
+  const later=m=>setTimeout(()=>toast(m),300);
+  const it=getItem(q.get('sssId')||'');
+  if(!it){clear();later('対象の商品が見つかりませんでした');return}
+  if(it.st==='sold'){clear();later('この商品は売却済みです');return}
+  const sp=num(q.get('soldPrice'));
+  if(!isFinite(sp)){clear();later('売却価格を読み取れなかったため、売却登録を行いませんでした');return}
+  let sd=String(q.get('soldDate')||'');if(!/^\d{4}-\d{2}-\d{2}$/.test(sd))sd=today();
+  let ch=String(q.get('soldCh')||'');if(!CH.includes(ch))ch='';
+  const fr=q.get('soldFee');const fee=(fr!==null&&fr!==''&&isFinite(num(fr)))?num(fr):null;
+  POSTA_PENDING={id:it.id,sp,sd,ch,fee};clear();
+  openSheet('POSTAからの売却登録',`<div class="note mb2">POSTAの売上記録から渡された内容です。確認して「売却済みとして登録する」を押すと、この商品に反映されます。</div>
+  <div class="card"><table><tr><td>商品名</td><td class="wrap">${esc(it.name||'(無題)')}</td></tr><tr><td>現在のステータス</td><td>${esc(ST[it.st]||it.st||'')}</td></tr>
+  <tr><td>売却価格</td><td class="num">${yenT(sp)}</td></tr><tr><td>売却日</td><td class="num">${esc(sd)}</td></tr>
+  <tr><td>販路</td><td>${ch?esc(S.settings.ch[ch].name):'（不明）'}</td></tr>${fee!==null?`<tr><td>手数料</td><td class="num">${yenT(fee)}</td></tr>`:''}</table></div>
+  <div class="btns mt3"><button class="btn pri" data-act="postaSoldOk">売却済みとして登録する</button><button class="btn" data-act="postaSoldCancel">やめる</button></div>`);
+}
+postaSoldFromURL();
 setTab('look');
 </script>
 </body>
