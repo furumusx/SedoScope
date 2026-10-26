@@ -215,9 +215,10 @@ input[type="date"]{min-width:0;max-width:100%}
    データ: localStorage "sedoscope_s_v1"（SedoScope本体 "sedoscope_v1" とは別）
    外部通信: openBD ISBN照会のみ
    ============================================================ */
-const APP_VER='1.4.7';
+const APP_VER='1.4.8';
 const APP_DATE='2026-10-24';
 const CHANGELOG=[
+  'v1.4.8（2026-10-26）一覧の束ねで、違う作品の単巻も『まとめ売り』として束ねられるようにした（商品名は束ねる時に編集可能。想定売価はメンバー単巻の想定売価の合計で表示）。',
   'v1.4.7（2026-10-25）POSTAの売上記録から渡された売却情報を、確認画面で確かめてから「売却済み」として登録できるようにした（自動では反映しない）。',
   'v1.4.6（2026-10-25）「BORUTO―ボルト― 3 ―TWO BLUE VORTEX―」のように巻数がタイトルの真ん中にある本を、同じ作品として扱えていなかった問題を直した。この形式でも単巻をセットとして束ねられるようになり、巻数の読み取りもできるようになった。',
   'v1.4.5（2026-10-25）一覧の絞り込みをシート方式にした。「絞り込み」ボタンから、ジャンル・出版社・状態に加えて仕入店舗・区分・仕入月でも絞り込める。適用中の条件はボタンの横に表示され、個別に外すこともできる。',
@@ -434,19 +435,23 @@ function analyze(ctx){
   let pool=poolItemsFor(key,true);if(it&&!pool.includes(it))pool.unshift(it);   // 欠巻・版違い用（作品単位）
   let ex,prov=false,grp='name';                                                              // 判定用（同じ商品名→同じ巻範囲）
   if(ctx.vitem){ex=[ctx.vitem]}
+  else if(it&&it.mixed)ex=[];   // まとめ売りは自分の名前では相場を見ない（想定売価はメンバー合計）
   else if(it)ex=exactItemsFor(it);
   else{const n=nname(title);ex=n?S.items.filter(x=>nname(x.name)===n):[];if(!ex.length){ex=poolItemsFor(key);prov=ex.length>0}}
   const qsAll=poolQuotes(ex,key);let qs=qsAll;
-  if(it&&!prov&&!ctx.vitem){const tn=tnorm(it.name);qs=qsAll.filter(q=>!q.title||tnorm(q.title)===tn);qs.nameExcluded=qsAll.length-qs.length;
+  if(it&&!prov&&!ctx.vitem&&!it.mixed){const tn=tnorm(it.name);qs=qsAll.filter(q=>!q.title||tnorm(q.title)===tn);qs.nameExcluded=qsAll.length-qs.length;
     const soldN=qs.filter(q=>q.status==='sold').length;
     if(soldN<3){const rng=itemRangeOf(it);if(rng){let rq=rangeQuotes(key,rng[0],rng[1]);
       if(rq.filter(q=>q.status==='sold').length<=soldN){const lk=workKey(String(it.name).split(/[=＝]/)[0].replace(/[A-Za-z0-9.]+/g,' '));if(lk&&lk!==key){const rq2=rangeQuotes(lk,rng[0],rng[1]);if(rq2.filter(q=>q.status==='sold').length>rq.filter(q=>q.status==='sold').length)rq=rq2}}
       if(rq.filter(q=>q.status==='sold').length>soldN){qs=rq;grp='range';ex=pool}}}}
   else if(prov){const tr=volRangeOfName(title);if(tr){const rq=rangeQuotes(key,tr[0],tr[1]);if(rq.some(q=>q.status==='sold')){qs=rq;grp='range'}}}
   const st=qstats(qs),acc=accFactor(it);
-  const chs=[];
+  const chs=[];let memMiss=false;
   for(const c of CH){const cs=set.ch[c];if(!cs.on)continue;let base=NaN,basis='';const man=it?num(it['p'+c]):NaN;
     if(man>0){base=man;basis='手入力の想定価格'}
+    else if(it&&it.mixed){const mem=S.items.filter(m=>m.inSet===it.id);let sum=0,n=0,miss=0;
+      if((ctx._d||0)<4)for(const m of mem){const am=analyze({itemId:m.id,_d:(ctx._d||0)+1});const mc=am.chs.find(x=>x.c===c);if(mc&&mc.sale>0){sum+=mc.sale;n++}else miss++}
+      if(n){base=sum;basis=`メンバー合計（${n}冊${miss?`・${miss}冊は想定なし`:''}）`;memMiss=memMiss||miss>0}}
     else{const own=qs.filter(q=>q.status==='sold'&&q.ch===c).map(q=>q.price);const arr=own.length?own:st.sp;
       const src=own.length?cs.name:'全販路';
       if(arr.length>=3){const bd=modeBand(arr);base=set.mode==='cons'?bd.lo:Math.floor(bd.avg/10)*10;
@@ -469,6 +474,7 @@ function analyze(ctx){
     ed:editionNote(title,pool,it),
     dup:dupInfo(ctx.code||(it&&it.code),ctx.scan?null:(it&&it.id)),
     acc:acc.miss,
+    memSum:!!(it&&it.mixed),memMiss,
     excluded:qs.excluded,
     nameExcluded:qs.nameExcluded||0,
     grp,
@@ -604,6 +610,9 @@ function renderResult(){
   if(f.grp==='range'&&b)chips.push(`<span class="chip info">同じ巻範囲の相場${a.st.soldN}件で判定（商品名一致が3件未満のため）</span>`);
   if(f.acc.length)chips.push(`<span class="chip info">付属品 ${esc(f.acc.join('・'))}</span>`);
   if(b&&b.basis.startsWith('手入力'))chips.push(`<span class="chip info">手入力の想定価格を使用</span>`);
+  if(f.memSum&&b&&b.basis.startsWith('メンバー合計'))chips.push(`<span class="chip info">🧺 想定売価はメンバー合計（まとめ売り）</span>`);
+  if(f.memSum&&f.memMiss)chips.push(`<span class="chip warn">一部メンバーは想定なし（その分は合計に入っていません）</span>`);
+  if(f.memSum&&!b)chips.push(`<span class="chip warn">メンバーの想定売価がありません</span>`);
   const bunN=a.it?singlesInCartFor(a.it).length:0;
   const bunBtn=(a.it&&!CUR.bundleCtx&&bunN>=2)?`<div class="btns mt2"><button class="btn sm" data-act="setBundle" data-id="${esc(a.it.id)}">🧺 カゴの単巻${bunN}冊をこのセットとして判定</button></div>`:'';
   const links=linksHTML({title:CUR.title||(a.it&&a.it.name)||'',code:CUR.code||(a.it&&a.it.code)||'',author:CUR.author||(a.it&&a.it.author)||''});
@@ -803,13 +812,22 @@ function buyRows(ids){
 }
 
 /* ---------- 一覧で束ねる ---------- */
+// まとめ売りの商品名：メンバー名の最長共通接頭辞（末尾の空白・記号は除く）＋「まとめ売り」
+function mixedName(ms){const ns=ms.map(m=>String(m.name||''));let pre=ns[0]||'';
+  for(const n of ns.slice(1)){let i=0;while(i<pre.length&&i<n.length&&pre[i]===n[i])i++;pre=pre.slice(0,i)}
+  pre=pre.replace(/[\s・:：\/／\-―—(（　]+$/,'').trim();
+  return [...pre].length>=2?`${pre} まとめ売り`:`${ns[0]} 他まとめ売り`}
 function listBundleMake(){
   const ids=Object.keys(UI.listSel).filter(k=>UI.listSel[k]);
   const ms=ids.map(id=>getItem(id)).filter(Boolean);
   if(ms.length<2){toast('2冊以上選んでください');return}
   if(ms.some(m=>m.st==='sold')){toast('売却済の商品は束ねられません');return}
   const key=itemKey(ms[0]);
-  if(ms.some(m=>itemKey(m)!==key)){toast('同じ作品の単巻だけを選んでください');return}
+  const mixed=ms.some(m=>itemKey(m)!==key);
+  if(mixed){openSheet('まとめ売りとして束ねる',`<div class="note mb2">選んだ${ms.length}冊には違う作品が含まれています。<b>まとめ売り</b>として1つの商品に束ねます。単巻は一覧では隠れます。※想定売価は、メンバー単巻それぞれの想定売価の合計で表示されます。</div>
+  <div class="fld"><label>商品名（あとから編集画面でも変えられます）</label><input id="bunName" value="${esc(mixedName(ms))}"></div>
+  <div class="note mb2">仕入価格の合計 ${yenT(ms.reduce((s,m)=>s+(num(m.cost)||0),0))}（未入力は0円として計算）</div>
+  <button class="btn pri" style="width:100%" data-act="listBundleDo" data-mixed="1" data-ids="${esc(ids.join(','))}">まとめ売りとして束ねる</button>`);return}
   let rg=null;for(const m of ms){const r=itemRangeOf(m);if(r)rg=rg?bundleRange(rg,r):r}
   openSheet('セットとして束ねる',`<div class="note mb2">選んだ${ms.length}冊を1つのセット商品にまとめます。単巻はセット商品の中に入り、一覧ではセット商品だけが表示されます。</div>
   <div class="fld"><label>巻の範囲（開始巻）</label><input id="bunLo" inputmode="numeric" value="${rg?rg[0]:''}"></div>
@@ -820,6 +838,12 @@ function listBundleMake(){
 function listBundleDoAct(b){
   const ids=b.dataset.ids.split(',').filter(Boolean);
   const ms=ids.map(id=>getItem(id)).filter(Boolean);
+  if(b.dataset.mixed==='1'){
+    const name=(($('#bunName')||{}).value||'').trim()||mixedName(ms);
+    const cost=ms.reduce((s,m)=>s+(num(m.cost)||0),0);const allStock=ms.every(m=>m.st==='stock'||m.st==='listed');
+    const target=newItem({name,work:'',setk:'セット',range:'',have:'',st:allStock?'stock':'cand',cost:allStock?cost:'',genre:ms[0].genre||'',pub:ms[0].pub||'',autoBundle:1,mixed:1,memo:'一覧で束ね（まとめ売り）：'+ms.map(m=>m.name).join('、')});
+    S.items.unshift(target);ms.forEach(m=>m.inSet=target.id);
+    UI.listSel={};save();closeSheet();setTab('list');toast('まとめ売りとして束ねました');return}
   const lo=num($('#bunLo').value),hi=num($('#bunHi').value);
   if(!(lo>0)||!(hi>=lo)){toast('巻の範囲を入力してください');return}
   const key=itemKey(ms[0]);
