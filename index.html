@@ -169,6 +169,12 @@ table.fixt{table-layout:fixed}
 .self span{font-size:var(--fs-sub);color:var(--mut)}
 .self select{width:100%;background:var(--card2);border:1px solid var(--line);border-radius:var(--r-md);height:36px;padding:0 var(--sp2);font-size:14px}
 .qchk{width:20px;height:20px;flex:none;accent-color:var(--acc)}
+.hunt-acc summary{font-weight:700;cursor:pointer}
+.hrow{display:flex;gap:var(--sp2);padding:var(--sp2) 0;border-bottom:1px solid var(--line);cursor:pointer}
+.hrow .t{font-weight:600;overflow-wrap:anywhere}.hrow .s{font-size:var(--fs-sub);color:var(--mut)}
+.hrow .hd{font-size:11px;color:var(--mut);text-align:right;flex:none}.hrow .hd.old{color:var(--w)}
+.chip.hunt{border-color:#25506b;background:#10283a;color:#8fd3ff;font-weight:700}
+label.pick{position:relative;overflow:hidden}label.pick input{position:absolute;inset:0;opacity:0;font-size:0}
 .selbar{position:fixed;left:12px;right:12px;bottom:calc(var(--tabh) + var(--safe) + var(--sp2));z-index:35;background:var(--card2);border:1px solid var(--line);border-radius:var(--r-lg);padding:var(--sp2) var(--sp3);display:flex;gap:var(--sp2);align-items:center;box-shadow:0 6px 18px rgba(0,0,0,.45)}
 .selbar .grow{font-size:13px}
 .grid2>.fld,.grid3>.fld{min-width:0}
@@ -200,7 +206,6 @@ input[type="date"]{min-width:0;max-width:100%}
 <div id="pad" hidden></div>
 <nav id="tabs">
   <button data-tab="look"><span class="i">🔍</span>調べる</button>
-  <button data-tab="cart"><span class="i">🧺</span>カゴ<span class="badge" id="qbadge" hidden></span></button>
   <button data-tab="list"><span class="i">📚</span>一覧</button>
   <button data-tab="stats"><span class="i">📊</span>集計</button>
   <button data-tab="set"><span class="i">⚙️</span>設定</button>
@@ -215,9 +220,11 @@ input[type="date"]{min-width:0;max-width:100%}
    データ: localStorage "sedoscope_s_v1"（SedoScope本体 "sedoscope_v1" とは別）
    外部通信: openBD ISBN照会のみ
    ============================================================ */
-const APP_VER='1.4.8';
+const APP_VER='1.5.0';
 const APP_DATE='2026-10-24';
 const CHANGELOG=[
+  'v1.5.0（2026-10-27）相場CSVの「貼り付け」取り込みが読まれていなかった不具合を修正。タブを4つ（調べる／一覧／集計／設定）にし、カゴを廃止。「調べる」は探し物チェックリスト専用（出版社別・所持巻・確認日・絞り込み検索）にした。保存済みのカゴのデータは消さずに残している。',
+  'v1.4.9（2026-10-27）探し物リスト連携：判定の照合先を探し物リスト優先にし（買い上限はリストの値、所持巻は在庫から自動表示）、調べるタブに探し物リスト区画を追加。一覧に「読み取りで追加」（仕入価格を入れてバーコードを連続読み取り→仕入済みに登録、同じ巻の在庫があれば注意）を追加。',
   'v1.4.8（2026-10-26）一覧の束ねで、違う作品の単巻も『まとめ売り』として束ねられるようにした（商品名は束ねる時に編集可能。想定売価はメンバー単巻の想定売価の合計で表示）。',
   'v1.4.7（2026-10-25）POSTAの売上記録から渡された売却情報を、確認画面で確かめてから「売却済み」として登録できるようにした（自動では反映しない）。',
   'v1.4.6（2026-10-25）「BORUTO―ボルト― 3 ―TWO BLUE VORTEX―」のように巻数がタイトルの真ん中にある本を、同じ作品として扱えていなかった問題を直した。この形式でも単巻をセットとして束ねられるようになり、巻数の読み取りもできるようになった。',
@@ -258,7 +265,7 @@ function defSettings(){return{
   acc:{obi:10,cover:30,booklet:10,poster:5,other:0},
   store:'',stores:[],budget:'',autoQueue:false,postaUrl:'https://furumusx.github.io/posta/',
 }}
-function defState(){return{schema:1,items:[],queue:[],biblio:{},settings:defSettings(),links:DEF_LINKS.map(x=>({...x})),
+function defState(){return{schema:1,items:[],hunt:[],queue:[],biblio:{},settings:defSettings(),links:DEF_LINKS.map(x=>({...x})),
   meta:{created:new Date().toISOString(),lastBackup:null,imports:[]}}}
 
 /* ---------- 保存 ---------- */
@@ -271,6 +278,7 @@ function fixState(s){
   const ch={}; for(const c of CH) ch[c]=Object.assign({},ds.ch[c],(ss.ch||{})[c]||{});
   s.settings=Object.assign(ds,ss,{ch,acc:Object.assign({},ds.acc,ss.acc||{})});
   s.links=Array.isArray(s.links)?s.links:d.links;
+  s.hunt=Array.isArray(s.hunt)?s.hunt:[];
   s.meta=Object.assign(d.meta,s.meta||{});
   s.schema=1; return s;
 }
@@ -426,6 +434,22 @@ function accFactor(it){let f=1;const miss=[];
   if(it&&it.acc)for(const [k,l] of ACC){if(it.acc[k]==='no'){const r=num(S.settings.acc[k])||0;f*=1-r/100;miss.push(l+'なし'+(r?`（-${r}%）`:''))}}
   return{f,miss}}
 
+/* ---------- 探し物リスト ---------- */
+const hkey=e=>workKey(e.work||e.title);
+function keyMatch(a,b){if(!a||!b)return false;if(a===b)return true;const s1=a.length<=b.length?a:b,l=a.length<=b.length?b:a;return s1.length>=3&&l.includes(s1)}
+function itemVols(it){if(it.have){const s=parseVols(it.have);if(s.size)return s}const r=itemRangeOf(it);const out=new Set();if(r)for(let v=r[0];v<=r[1];v++)out.add(v);return out}
+function huntInv(e){const k=hkey(e);return S.items.filter(it=>(it.st==='stock'||it.st==='listed')&&!it.mixed&&keyMatch(k,itemKey(it)))}
+function ownedVols(e){const set=new Set();for(const it of huntInv(e))for(const v of itemVols(it))set.add(v);return set}
+function huntHit(key){if(!key||!S.hunt||!S.hunt.length)return null;return S.hunt.find(e=>keyMatch(hkey(e),key))||null}
+function isSetCtx(it,title){if(it){if(it.mixed||/セット/.test(String(it.setk||'')+String(it.name||'')))return true;const r=itemRangeOf(it);return !!(r&&r[1]>r[0])}
+  const t=String(title||'');if(/セット|全巻/.test(t))return true;const r=volRangeOfName(t);return !!(r&&r[1]>r[0])}
+function huntNorm(o){if(!o||typeof o!=='object')return null;const n=v=>{const x=num(v);return isFinite(x)&&x>0?x:null};
+  const title=String(o.title||o.work||'').trim();if(!title)return null;
+  return{work:String(o.work||'').trim(),title,publisher:String(o.publisher||o.pub||'').trim(),vols:o.vols??'',median:n(o.median),perVolCap:n(o.perVolCap),setCap:n(o.setCap),memo:String(o.memo||''),provisional:o.provisional?1:0,checked:String(o.checked||'')}}
+function huntImport(txt){const o=JSON.parse(txt);const arr=Array.isArray(o)?o:(o&&(o.hunt||o.items||o.list||o.data));if(!Array.isArray(arr))throw new Error('探し物リストの形式ではありません');
+  let add=0,upd=0,bad=0;for(const r of arr){const e=huntNorm(r);if(!e){bad++;continue}const i=S.hunt.findIndex(x=>x.title===e.title);if(i>=0){S.hunt[i]=e;upd++}else{S.hunt.push(e);add++}}
+  save();return{add,upd,bad,total:S.hunt.length}}
+
 /* ---------- 判定 ---------- */
 function analyze(ctx){
   const set=S.settings,r=num(set.target)/100;
@@ -464,6 +488,7 @@ function analyze(ctx){
     const net=sale-fee-ship-pack-other;const max=Math.floor((net-sale*r)/10)*10;
     chs.push({c,name:cs.name,base,sale,fee,ship,pack,other,net,max,basis})}
   let best=null;if(chs.length){if(set.pick==='main')best=chs.find(x=>x.c===set.main)||null;if(!best)best=chs.reduce((a,b)=>b.max>a.max?b:a)}
+  const hunt=null;   // v1.5.0：判定の照合先としての探し物リストは撤去（リストは調べるタブのチェックリストとして使う）
   const sd=st.latest?daysAgo(st.latest):null;
   const flags={
     disp:st.sp.length>=2&&st.lo>0&&st.hi/st.lo>num(set.disp),
@@ -481,12 +506,16 @@ function analyze(ctx){
     prov
   };
   flags.missing=flags.vol&&flags.vol.missing.length?flags.vol.missing:[];
+  flags.hunt=hunt;
   return{it,title,key,pool,ex,qs,st,chs,best,flags};
 }
 function evalPrice(a,price){
   const b=a.best,r=num(S.settings.target)/100,f=a.flags;
   if(!b)return{sig:'n',profit:NaN,rate:NaN,price:NaN};
   const p=num(price);let sig=null,profit=NaN,rate=NaN;
+  if(b.hunt){if(isFinite(p)){if(isFinite(b.net)){profit=b.net-p;rate=profit/b.sale}
+      sig=p>b.max?'w':((isFinite(rate)&&rate>=r+0.15&&!f.hunt.e.provisional)?'ss':'s');if(isFinite(profit)&&profit<=0)sig='x'}
+    return{sig,profit,rate,price:p}}
   if(isFinite(p)){profit=b.net-p;rate=profit/b.sale;sig=profit<=0?'x':rate>=r?((rate>=r+0.15&&a.st.soldN>=3)?'ss':'s'):'w'}
   const down=f.disp||f.bimodal||f.missing.length>0;
   if(down&&sig!=='x')sig='w';
@@ -533,17 +562,17 @@ function setTab(t){
 function render(){
   $('#ver').textContent='v'+APP_VER;$('#hdStore').textContent=S.settings.store?('🏬 '+S.settings.store):'';
   renderBadge();
-  const v=$('#view');v.classList.toggle('withpad',UI.tab==='look');$('#pad').hidden=UI.tab!=='look';
+  const v=$('#view');v.classList.remove('withpad');$('#pad').hidden=true;
   if(UI.tab!=='look'){const z=()=>{if(UI.tab!=='look')document.documentElement.style.setProperty('--padh','0px')};z();requestAnimationFrame(z)}
   const bn='<div id="banner"></div>';
-  if(UI.tab==='look'){v.innerHTML=bn+lookHTML();renderPad();renderResult();renderCalc()}
+  if(UI.tab==='look'){v.innerHTML=bn+huntPage()}
   else if(UI.tab==='cart')v.innerHTML=bn+cartHTML();
   else if(UI.tab==='list')v.innerHTML=bn+listHTML();
   else if(UI.tab==='stats')v.innerHTML=bn+statsHTML();
   else v.innerHTML=bn+setHTML();
   renderBanner();
 }
-function renderBadge(){const b=$('#qbadge');b.hidden=!S.queue.length;b.textContent=S.queue.length}
+function renderBadge(){if(!$('#qbadge'))return;const b=$('#qbadge');b.hidden=!S.queue.length;b.textContent=S.queue.length}
 function renderBanner(){
   const lb=S.meta.lastBackup,el=$('#banner');if(!el)return;let msg='';
   if(S.items.length){if(!lb)msg='まだバックアップを書き出していません。';else{const d=daysAgo(lb);if(d>num(S.settings.backupWarn))msg=`前回のバックアップから${d}日経過しています。`}}
@@ -553,7 +582,7 @@ function renderBanner(){
 /* ---------- 調べる ---------- */
 function lookHTML(){
   return `<div class="srch"><input id="q" type="search" inputmode="search" placeholder="ISBN／JAN／タイトル" enterkeyhint="search" autocomplete="off"><button class="btn pri" data-act="doSearch">検索</button></div>
-  <div id="camWrap"></div><div id="srchRes"></div><div id="res"></div><div id="calc"></div>`;
+  <div id="camWrap"></div><div id="srchRes"></div><div id="res"></div><div id="calc"></div><div id="huntBox">${huntHTML()}</div>`;
 }
 function renderPad(){
   const p=$('#pad');
@@ -566,6 +595,33 @@ function renderPad(){
   updatePV();
 }
 function updatePV(){const e=$('#pv');if(e)e.textContent=CUR&&CUR.price!==''&&CUR.price!=null?Number(CUR.price).toLocaleString('ja-JP'):'—'}
+function huntPage(){const L=S.hunt||[];
+  if(!L.length)return `<div class="empty">📋 探し物リストはまだありません。<br>設定タブの「探し物リストを取り込む」から、探し物リスト（JSON）を読み込んでください。<br><button class="btn pri mt3" data-tab="set">設定タブを開く</button></div>`;
+  const q=String(UI.hq||'').normalize('NFKC').toLowerCase();
+  const hit=L.map((e,i)=>[e,i]).filter(([e])=>!q||[e.title,e.work,e.publisher].join(' ').normalize('NFKC').toLowerCase().includes(q));
+  const groups={};hit.forEach(([e,i])=>{const k=e.publisher||'（出版社なし）';(groups[k]=groups[k]||[]).push([e,i])});const fresh=num(S.settings.fresh)||30;
+  return `<div class="srch"><input id="hq" type="search" placeholder="作品名・出版社で絞り込み" value="${esc(UI.hq||'')}"></div>
+  <div class="note mb2">📋 探し物リスト ${hit.length}${q?` / ${L.length}`:''}件　所持巻は在庫（仕入済・出品中）から自動で計算しています。</div>
+  ${Object.keys(groups).sort().map(g=>`<div class="sec">${esc(g)}（${groups[g].length}）</div><div class="card">${groups[g].map(([e,i])=>{const o=[...ownedVols(e)].sort((x,y)=>x-y);const d=e.checked?daysAgo(e.checked):null;
+    return `<div class="hrow" data-act="huntOpen" data-i="${i}"><div class="grow"><div class="t">${esc(e.title)}${e.provisional?' <span class="st listed">要再調査</span>':''}</div>
+    <div class="s">中央値 ${e.median?yenT(e.median):'—'}・${e.perVolCap?`単巻上限 ${yenT(e.perVolCap)}`:''}${e.perVolCap&&e.setCap?'・':''}${e.setCap?`セット上限 ${yenT(e.setCap)}`:''}${!e.perVolCap&&!e.setCap?'上限なし':''}・所持：${o.length?esc(compactVols(o)):'なし'}</div>
+    ${e.memo?`<div class="s">${esc(e.memo)}</div>`:''}</div><div class="hd ${d!==null&&d>fresh?'old':''}">${e.checked?`確認 ${esc(e.checked.slice(5))}${d!==null&&d>fresh?'<br>古い':''}`:'確認日なし'}</div></div>`}).join('')}</div>`).join('')||'<div class="empty">該当する作品はありません。</div>'}`}
+function huntHTML(){const L=S.hunt||[];if(!L.length)return `<details class="card hunt-acc"><summary>📋 探し物リスト（未登録）</summary><div class="note mt2">設定タブの「探し物リストを取り込む」で読み込むと、ここに出版社ごとに表示されます。</div></details>`;
+  const groups={};L.forEach((e,i)=>{const k=e.publisher||'（出版社なし）';(groups[k]=groups[k]||[]).push([e,i])});
+  const fresh=num(S.settings.fresh)||30;
+  return `<details class="card hunt-acc"${UI.huntOpen?' open':''} ontoggle="UI.huntOpen=this.open"><summary>📋 探し物リスト（${L.length}件）</summary>
+  ${Object.keys(groups).sort().map(g=>`<div class="sec">${esc(g)}</div>${groups[g].map(([e,i])=>{const o=[...ownedVols(e)].sort((x,y)=>x-y);const d=e.checked?daysAgo(e.checked):null;
+    return `<div class="hrow" data-act="huntOpen" data-i="${i}"><div class="grow"><div class="t">${esc(e.title)}${e.provisional?' <span class="st listed">要再調査</span>':''}</div>
+    <div class="s">中央値 ${e.median?yenT(e.median):'—'}・${e.perVolCap?`単巻上限 ${yenT(e.perVolCap)}`:e.setCap?`セット上限 ${yenT(e.setCap)}`:'上限なし'}・所持：${o.length?esc(compactVols(o)):'なし'}</div>
+    ${e.memo?`<div class="s">${esc(e.memo)}</div>`:''}</div><div class="hd ${d!==null&&d>fresh?'old':''}">${e.checked?`確認 ${esc(e.checked.slice(5))}${d!==null&&d>fresh?'<br>古い':''}`:'確認日なし'}</div></div>`}).join('')}`).join('')}</details>`}
+function renderHunt(){const e=$('#huntBox');if(e)e.innerHTML=huntHTML()}
+function huntDetail(e){const inv=huntInv(e);const o=[...ownedVols(e)].sort((x,y)=>x-y);
+  openSheet(e.title,`<div class="card"><table>
+  <tr><td>作品名（照合用）</td><td class="wrap">${esc(e.work||'—')}</td></tr><tr><td>出版社</td><td>${esc(e.publisher||'—')}</td></tr><tr><td>巻</td><td>${esc(e.vols||'—')}</td></tr>
+  <tr><td>中央値</td><td class="num">${e.median?yenT(e.median):'—'}</td></tr><tr><td>単巻上限</td><td class="num">${e.perVolCap?yenT(e.perVolCap):'—'}</td></tr><tr><td>セット上限</td><td class="num">${e.setCap?yenT(e.setCap):'—'}</td></tr>
+  <tr><td>確認日</td><td>${esc(e.checked||'—')}${e.provisional?'（要再調査）':''}</td></tr><tr><td>所持（在庫から自動）</td><td>${o.length?esc(compactVols(o)):'なし'}</td></tr></table>
+  ${e.memo?`<div class="note mt2">${esc(e.memo)}</div>`:''}</div>
+  <div class="sec">この作品の在庫（${inv.length}件）</div><div class="list">${inv.map(it=>`<div class="it" data-act="openItem" data-id="${esc(it.id)}"><div class="m"><div class="t">${esc(it.name)}</div><div class="s"><span class="st ${it.st}">${ST[it.st]}</span>${it.inSet?'束ねたセットの中':''}</div></div></div>`).join('')||'<div class="note">在庫はありません</div>'}</div>`)}
 function renderResult(){
   const el=$('#res');if(!el)return;
   if(!CUR){el.innerHTML=`<div class="empty">📷 スキャン、またはISBN／タイトルを入力して調べます。<br><span class="note">相場データ：登録済み ${S.items.length}商品／相場 ${S.items.reduce((s,i)=>s+(i.quotes||[]).length,0)}件</span></div>`;return}
@@ -588,7 +644,7 @@ function renderResult(){
     if(sigK){const [m,t]=SIG[sigK];
       mid=`<div class="judge"><div class="sig ${sigK}"><div class="mk">${m}</div><div class="tx">${t}</div></div>
       <div class="kp"><label>仕入上限</label><div class="big">${yen(b.max)}</div>
-      ${isFinite(ev.profit)?`<label>予想利益（利益率）</label><div class="mid ${ev.profit>0?'pos':'neg'}">${yen(ev.profit)} <span class="num fz-body">${pct(ev.rate)}</span></div>`:'<div class="note">店頭価格を入力すると判定します</div>'}${refNote}</div></div>`;
+      ${isFinite(ev.profit)?`<label>予想利益（利益率）</label><div class="mid ${ev.profit>0?'pos':'neg'}">${yen(ev.profit)} <span class="num fz-body">${pct(ev.rate)}</span></div>`:(b.hunt&&isFinite(ev.price)?`<div class="note">${ev.price<=b.max?'探し物リストの買い上限以内です':'探し物リストの買い上限を超えています'}（単巻の利益は相場データがないため計算していません）</div>`:'<div class="note">店頭価格を入力すると判定します</div>')}${refNote}</div></div>`;
     }else{
       mid=`<div class="judge"><div class="sig n"><div class="mk">¥</div><div class="tx">価格入力</div></div>
       <div class="kp"><label>仕入上限（目標${esc(S.settings.target)}%）</label><div class="big">${yen(b.max)}</div><div class="note">店頭価格を入力すると判定します</div>${refNote}</div></div>`;
@@ -597,6 +653,13 @@ function renderResult(){
   let basis='';
   if(b){basis=`<div class="basis">想定売価 ${yenT(b.sale)}（${esc(b.name)}／${esc(b.basis)}）・最新売り切れ ${a.st.latest?mdShort(a.st.latest)+`（${f.staleDays}日前）`:'—'}・売切${a.st.soldN}件／出品中${a.st.lisN}件</div>`}
   const chips=[];
+  if(f.hunt){const h=f.hunt,o=[...h.owned].sort((x,y)=>x-y);const tv=a.it?null:volOf(CUR.title||'');
+    chips.push(`<span class="chip hunt" data-act="huntOpenKey" data-t="${esc(h.e.title)}">📋 探し物リスト：${esc(h.e.title)}</span>`);
+    chips.push(`<span class="chip info">所持：${o.length?esc(compactVols(o)):'なし'}</span>`);
+    if(tv&&h.owned.has(tv))chips.push(`<span class="chip bad">⛔ ${tv}巻は所持済み</span>`);
+    if(h.e.provisional)chips.push('<span class="chip warn">要再調査（暫定値）</span>');
+    if(!(h.cap>0))chips.push(`<span class="chip warn">リストに${h.isSet?'セット上限・中央値':'単巻上限'}がないため相場プールで判定</span>`);
+    else if(h.poolBest)chips.push(`<span class="chip info">参考：相場プールの上限 ${yenT(h.poolBest.max)}</span>`)}
   for(const d of f.dup)chips.push(`<span class="chip ${d.lv}" data-act="openItem" data-id="${esc(d.id)}">${d.lv==='bad'?'⛔ ':''}${esc(d.t)}</span>`);
   if(f.disp)chips.push(`<span class="chip warn">⚠ ばらつき大（高値÷底値 ${(a.st.hi/a.st.lo).toFixed(1)}倍）</span>`);
   if(f.bimodal)chips.push(`<span class="chip warn">⚠ 価格帯が2つに分かれています（初版/復刊など混在注意）</span>`);
@@ -811,6 +874,32 @@ function buyRows(ids){
   save();toast(`${n}冊を購入登録しました${skip?`（価格未入力 ${skip}冊は残しました）`:''}`);render();
 }
 
+/* ---------- 一覧：読み取りで仕入済みに追加（定額で何冊も買うとき用） ---------- */
+let REG=null;
+function regOpen(){REG={log:[],pend:null};const s=S.settings;
+  openSheet('読み取りで仕入済みに追加',`<div class="note mb2">先に仕入価格（1冊あたり）・仕入日・仕入元を入れてから、バーコードを続けて読み取ってください。読み取るたびに仕入済みとして登録します。</div>
+  <div class="grid3"><div class="fld"><label>仕入価格（単価）</label><input id="rgP" inputmode="numeric" placeholder="110"></div><div class="fld"><label>仕入日</label><input id="rgD" type="date" value="${today()}"></div>
+  <div class="fld"><label>仕入元</label><input id="rgS" list="rgSL" value="${esc(s.store||'')}"><datalist id="rgSL">${(s.stores||[]).map(x=>`<option value="${esc(x)}">`).join('')}</datalist></div></div>
+  <button class="btn pri" style="width:100%" id="regScanBtn" data-act="regScan">📷 読み取り開始</button>
+  <div id="regCam" class="mt2"></div><div id="regPend"></div>
+  <div class="sec">読み取れないとき</div>
+  <div class="row"><input id="rgIsbn" inputmode="numeric" placeholder="ISBNを入力" class="grow inline-in" style="width:auto;text-align:left"><button class="btn sm" data-act="regIsbn">追加</button></div>
+  <div class="row mt2"><input id="rgName" placeholder="商品名を手入力（例：BORUTO 3巻）" class="grow inline-in" style="width:auto;text-align:left"><button class="btn sm" data-act="regManual">追加</button></div>
+  <div class="sec">この画面で登録した本</div><div id="regLog" class="note">まだありません</div>`)}
+function regParams(){const p=num($('#rgP').value);if(!isFinite(p)){toast('先に仕入価格（単価）を入れてください');return null}return{p,d:$('#rgD').value||today(),st:($('#rgS').value||'').trim()}}
+function regDup(code,title){const c=normCode(code),k=workKey(title),v=volOf(title);
+  return S.items.filter(it=>(it.st==='stock'||it.st==='listed')&&((c&&normCode(it.code)===c)||(v&&keyMatch(k,itemKey(it))&&itemVols(it).has(v))))}
+function regAdd(o){const P=regParams();if(!P)return false;const it=newItem({name:o.title||o.code,code:o.code||'',author:o.author||'',pub:o.pub||'',cover:o.cover||'',st:'stock',cost:P.p,date:P.d,store:P.st});
+  S.items.unshift(it);save();REG.log.unshift(it.name);const l=$('#regLog');if(l)l.innerHTML=REG.log.map(n=>`✓ ${esc(n)}`).join('<br>');toast(`登録：${it.name}`);return true}
+function regPendShow(){const e=$('#regPend');if(!e)return;const P=REG&&REG.pend;if(!P){e.innerHTML='';return}
+  if(P.nobib)e.innerHTML=`<div class="banner mt2" style="flex-wrap:wrap">📕 書誌が見つかりませんでした（${esc(P.code)}）。商品名を入れて登録できます。<input id="rgPendName" class="inline-in" style="width:100%;text-align:left" placeholder="商品名"><button data-act="regPendManual">この名前で登録</button><button data-act="regPendSkip">スキップ</button></div>`;
+  else e.innerHTML=`<div class="banner mt2" style="flex-wrap:wrap">⚠ 同じ巻がすでに在庫にあります：${esc(P.dups.map(d=>d.name).join('、'))}<br>読み取った本：${esc(P.title)}<button data-act="regPendOk">それでも登録</button><button data-act="regPendSkip">スキップ</button></div>`}
+async function regCode(raw){if(!REG||REG.pend)return;if(!regParams())return;const code=normCode(raw);
+  let b=S.biblio[code];if(!b||!b.title)b=await fetchBiblio(code);if(!REG)return;
+  if(!b||!b.title){REG.pend={code,nobib:true};regPendShow();return}
+  const o={code,title:b.title,author:b.author,pub:b.pub,cover:b.cover};const d=regDup(code,b.title);
+  if(d.length){REG.pend=Object.assign(o,{dups:d});regPendShow();return}regAdd(o)}
+
 /* ---------- 一覧で束ねる ---------- */
 // まとめ売りの商品名：メンバー名の最長共通接頭辞（末尾の空白・記号は除く）＋「まとめ売り」
 function mixedName(ms){const ns=ms.map(m=>String(m.name||''));let pre=ns[0]||'';
@@ -895,7 +984,7 @@ function listHTML(){
   const memCnt={};for(const i of S.items)if(i.inSet)memCnt[i.inSet]=(memCnt[i.inSet]||0)+1;
   const selN=Object.keys(UI.listSel).filter(k=>UI.listSel[k]).length;
   const shown=arr.slice(0,UI.listN);
-  return `<div class="srch"><input id="lq" type="search" placeholder="タイトル・ISBN・タグ・店舗で絞り込み" value="${esc(UI.listQ)}"><button class="btn ${UI.listSelMode?'pri':''}" data-act="listSelMode">${UI.listSelMode?'選択中':'選択'}</button><button class="btn pri" data-act="newItem">＋新規</button></div>
+  return `<div class="srch"><input id="lq" type="search" placeholder="タイトル・ISBN・タグ・店舗で絞り込み" value="${esc(UI.listQ)}"><button class="btn ${UI.listSelMode?'pri':''}" data-act="listSelMode">${UI.listSelMode?'選択中':'選択'}</button><button class="btn" data-act="regOpen">📷 読み取りで追加</button><button class="btn pri" data-act="newItem">＋新規</button></div>
   <div class="fchips">${[['all','全部'],['cand','候補'],['stock','仕入済'],['listed','出品中'],['sold','売却済'],['re','再調査']].map(([k,l])=>`<button class="${f===k?'on':''}" data-act="listF" data-v="${k}">${l}${k!=='re'?' '+cnt(k):''}</button>`).join('')}</div>
   ${(()=>{const af=[['ジャンル',UI.listG,'listG'],['出版社',UI.listP,'listP'],['状態',UI.listC,'listC'],['仕入店舗',UI.listStore,'listStore'],['区分',UI.listK,'listK'],['仕入月',UI.listM,'listM']].filter(x=>x[1]);return `<div class="selfrow"><button class="btn sm" data-act="listFilterOpen">絞り込み${af.length?`（${af.length}）`:''}</button>${af.map(([lb,v,k])=>`<span class="chip">${lb}：${esc(v)} <a href="#" data-act="listFilterClear" data-k="${k}">✕</a></span>`).join('')}</div>`})()}
   ${f==='re'?'<div class="note mb2">最新の売り切れから'+esc(S.settings.fresh)+'日を超えた（または日付不明の）作品です。相場を取り直して取り込んでください。</div>':''}
@@ -933,7 +1022,7 @@ function listFilterSheet(){
   const body=sel('genre','ジャンル',vs('genre'),UI.listG)+sel('pub','出版社',vs('pub'),UI.listP)+sel('cond','状態',vs('cond'),UI.listC)+sel('store','仕入店舗',vs('store'),UI.listStore)+sel('setk','区分',vs('setk'),UI.listK)+sel('month','仕入月',months,UI.listM);
   return (body||'<div class="note">絞り込める項目がまだありません（ジャンルや店舗などの値が入ると、ここに出ます）</div>')+`<div class="btns mt3"><button class="btn" data-act="listFilterClearAll">すべてクリア</button><button class="btn pri" data-act="closeSheet">閉じる</button></div>`}
 function openSheet(title,html){$('#shT').textContent=title;$('#shB').innerHTML=html;$('#sheet').hidden=false;$('#shB').scrollTop=0}
-function closeSheet(){$('#sheet').hidden=true;EDIT=null}
+function closeSheet(){if(Scan.on&&Scan.wrapSel==='#regCam')stopScan();$('#sheet').hidden=true;EDIT=null;REG=null}
 function openItem(id,prefill){
   const it=id?getItem(id):null;if(id&&!it){toast('商品が見つかりません');return}
   EDIT=it?JSON.parse(JSON.stringify(it)):newItem(prefill||{});EDIT._isNew=!it;
@@ -984,7 +1073,7 @@ function drawEditor(){
   <div class="mt2">${qs.slice(0,80).map(q=>`<div class="qrow"><span>${q.status==='sold'?'売切':q.status==='listing'?'出品中':'不明'}・${esc(q.ch&&q.ch!=='o'?S.settings.ch[q.ch].name:q.src||'')}・${esc(q.cond||'')}<br><span class="mut">${esc(q.title||'')}</span></span><span class="num">${yenT(q.price)}<br><span class="mut">${esc(q.date||'')}</span></span></div>`).join('')}${qs.length>80?`<div class="note">ほか${qs.length-80}件</div>`:''}</div></div>`;
   const extra=Object.keys(e).filter(k=>!FIELDS.some(f=>f[0]===k)&&!['id','quotes','acc','created','_isNew','cover','autoBundle','inSet'].includes(k));
   if(extra.length)h+=`<div class="note mt3">その他の保存項目（表示のみ・そのまま保持）：${esc(extra.join(', '))}</div>`;
-  h+=`<div class="btns edfoot"><button class="btn pri" data-act="saveItem">保存</button><button class="btn" data-act="judgeItem">保存して判定を見る</button><button class="btn" data-act="postaItem">POSTAで出品メモ</button>${e._isNew?'':`<button class="btn dng" data-act="delItem">削除</button>`}</div>`;
+  h+=`<div class="btns edfoot"><button class="btn pri" data-act="saveItem">保存</button><button class="btn" data-act="postaItem">POSTAで出品メモ</button>${e._isNew?'':`<button class="btn dng" data-act="delItem">削除</button>`}</div>`;
   openSheet(e._isNew?'新規商品':(e.name||'商品'),h);
 }
 function readEditor(){
@@ -1048,7 +1137,6 @@ function setHTML(){
   <div class="fld"><label>店舗マスター（仕入店舗の選択肢）</label><div class="row"><input id="storeNew" placeholder="例：ブックオフ 鹿児島○○店"><button class="btn sm" data-act="storeAdd">追加</button></div>
   <div class="chips">${(s.stores||[]).map((x,i)=>`<span class="chip">${esc(x)} <a href="#" data-act="storeDel" data-i="${i}">✕</a></span>`).join('')||'<span class="note">未登録です</span>'}</div>
   <div class="btns mt2"><button class="btn sm" data-act="storeHarvest">既存の商品で使われている店舗を取り込む</button></div></div>
-  <label class="row lbl14"><input type="checkbox" data-set="autoQueue" ${s.autoQueue?'checked':''}> スキャンするたびカゴへ自動追加</label>
   <div class="note mt2">判定基準：◎ 利益率が目標＋15ポイント以上かつ売り切れ3件以上（鮮度低下時は○）／○ 目標以上／△ 利益は出るが目標未満、またはばらつき大・価格帯混在・欠巻あり／✕ 利益が出ない。</div></div>
   <div class="sec">手数料・送料（初期値は目安です。ご自身の実績値に直してください）</div><div class="card">
   <table><tr><th>販路</th><th>使う</th><th>手数料%</th><th>送料円</th></tr>${CH.map(c=>`<tr><td>${esc(s.ch[c].name)}</td><td><input type="checkbox" data-set="ch.${c}.on" ${s.ch[c].on?'checked':''}></td><td><input class="inline-in" style="width:64px" inputmode="decimal" data-set="ch.${c}.fee" value="${esc(s.ch[c].fee)}"></td><td><input class="inline-in" style="width:72px" inputmode="numeric" data-set="ch.${c}.ship" value="${esc(s.ch[c].ship)}"></td></tr>`).join('')}</table>
@@ -1065,7 +1153,7 @@ function setHTML(){
   前回のバックアップ：<b>${S.meta.lastBackup?esc(String(S.meta.lastBackup).slice(0,16).replace('T',' ')):'なし'}</b><br>
   保存キー：<span class="num">${KEY}</span>（SedoScope本体のデータとは別）
   <div class="btns mt3"><button class="btn pri" data-act="doBackup">バックアップを書き出す</button><button class="btn" data-act="copyBackup">バックアップをコピー</button><button class="btn" data-act="restoreOpen">バックアップから復元</button></div>
-  <div class="btns mt2"><button class="btn" data-act="sedoOpen">SedoScopeのデータを取り込む</button><button class="btn" data-act="csvOpen">相場CSVを取り込む</button></div>
+  <div class="btns mt2"><button class="btn" data-act="sedoOpen">SedoScopeのデータを取り込む</button><button class="btn" data-act="csvOpen">相場CSVを取り込む</button><label class="btn pick">探し物リストを取り込む<input type="file" id="huntF" accept=".json,application/json,text/plain"></label></div>
   <div class="btns mt2"><button class="btn dng" data-act="wipe">すべてのデータを初期化</button></div></div>
   <div class="note my3">SSS v${APP_VER}（${APP_DATE}）／外部通信は openBD（ISBNの書誌照会）のみ。</div>`;
 }
@@ -1200,7 +1288,7 @@ function importCSV(text,targetId,newName,src){
 function csvOpen(targetId,defName){
   const opts=S.items.slice(0,400).map(i=>`<option value="${esc(i.id)}"${String(i.id)===String(targetId)?' selected':''}>${esc((i.name||'(無題)').slice(0,40))}${i.code?' ／'+esc(i.code):''}</option>`).join('');
   openSheet('相場CSVを取り込む',`<div class="note mb2">ヘッダ「商品名,価格,販売状況,商品の状態」のCSVを取り込みます。確認日は取り込んだ日として記録します。同じ内容（商品名・価格・販売状況・状態・販路が同じ）の行は重複として除外します。</div>
-  <div class="fld"><label>取り込み先</label><select id="cvT"><option value="">＋新しい候補として作る</option>${opts}</select></div>
+  <div class="fld"><label>取り込み先</label><select id="cvTgt"><option value="">＋新しい候補として作る</option>${opts}</select></div>
   <div class="fld"><label>新しく作る場合の商品名</label><input id="cvN" value="${esc(defName||'')}" placeholder="空欄ならCSVの1行目の商品名"></div>
   <div class="fld"><label>販路ソース</label><select id="cvS">${CH.map(c=>`<option value="${c}">${esc(S.settings.ch[c].name)}</option>`).join('')}</select></div>
   ${fileOrTextHTML('cv','.csv,text/csv,text/plain','商品名,価格,販売状況,商品の状態\n…')}
@@ -1254,22 +1342,22 @@ function decodeFrame(v){
   cv.width=W;cv.height=H;cx=cx||cv.getContext('2d',{willReadFrequently:true});cx.drawImage(v,0,vh*0.25,vw,vh*0.5,0,0,W,H);
   return decodeImageData(cx.getImageData(0,0,W,H).data,W,H);
 }
-const Scan={on:false,stream:null,det:null,last:'',lastT:0,cand:'',candN:0,timer:null,ac:null};
+const Scan={on:false,stream:null,det:null,last:'',lastT:0,cand:'',candN:0,timer:null,ac:null,wrapSel:'#camWrap',handler:null};
 function beep(){try{Scan.ac=Scan.ac||new (window.AudioContext||window.webkitAudioContext)();const o=Scan.ac.createOscillator(),g=Scan.ac.createGain();o.frequency.value=1800;g.gain.value=.08;o.connect(g);g.connect(Scan.ac.destination);o.start();o.stop(Scan.ac.currentTime+.08)}catch(e){}}
-async function startScan(){
-  if(Scan.on)return;
+async function startScan(wrapSel,handler){
+  if(Scan.on)return;Scan.wrapSel=wrapSel||'#camWrap';Scan.handler=handler||null;
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){toast('この環境ではカメラを使えません。ISBNを入力してください');return}
   try{Scan.ac=Scan.ac||new (window.AudioContext||window.webkitAudioContext)();Scan.ac.resume&&Scan.ac.resume()}catch(e){}
-  const w=$('#camWrap');w.innerHTML=`<div id="cam"><video playsinline muted autoplay></video><div class="guide"></div><div class="hint">バーコードを赤線に合わせて横向きに（連続読み取り中）</div></div>`;
+  const w=$(Scan.wrapSel);if(!w)return;w.innerHTML=`<div id="cam"><video playsinline muted autoplay></video><div class="guide"></div><div class="hint">バーコードを赤線に合わせて横向きに（連続読み取り中）</div></div>`;
   const video=w.querySelector('video');
   try{Scan.stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}},audio:false})}
   catch(e){w.innerHTML='';toast('カメラを起動できません（'+e.name+'）。設定でカメラを許可するか、ISBNを入力してください');return}
   video.srcObject=Scan.stream;try{await video.play()}catch(e){}
   Scan.det=null;
   if('BarcodeDetector' in window){try{const f=await BarcodeDetector.getSupportedFormats();if(f.includes('ean_13'))Scan.det=new BarcodeDetector({formats:['ean_13']})}catch(e){}}
-  Scan.on=true;renderPad();loop(video);
+  Scan.on=true;if(Scan.wrapSel==='#camWrap')renderPad();loop(video);
 }
-function stopScan(){Scan.on=false;clearTimeout(Scan.timer);if(Scan.stream){Scan.stream.getTracks().forEach(t=>t.stop());Scan.stream=null}const w=$('#camWrap');if(w)w.innerHTML='';if(UI.tab==='look'&&$('#pad').innerHTML)renderPad()}
+function stopScan(){Scan.on=false;clearTimeout(Scan.timer);if(Scan.stream){Scan.stream.getTracks().forEach(t=>t.stop());Scan.stream=null}const w=$(Scan.wrapSel||'#camWrap');if(w)w.innerHTML='';const rb=$('#regScanBtn');if(rb)rb.textContent='📷 読み取り開始';if(UI.tab==='look'&&$('#pad').innerHTML)renderPad()}
 async function loop(video){
   if(!Scan.on)return;let code=null;
   try{if(Scan.det){const r=await Scan.det.detect(video);for(const b of r){if(okScanCode(b.rawValue)){code=b.rawValue;break}}}else code=decodeFrame(video)}catch(e){}
@@ -1279,7 +1367,7 @@ function onCode(code){
   if(!Scan.det){if(code===Scan.cand)Scan.candN++;else{Scan.cand=code;Scan.candN=1}if(Scan.candN<2)return}
   const t=Date.now();if(code===Scan.last&&t-Scan.lastT<3000)return;Scan.last=code;Scan.lastT=t;
   beep();const c=$('#cam');if(c){c.classList.add('hit');setTimeout(()=>c.classList.remove('hit'),350)}
-  lookupCode(code,{auto:true});
+  if(Scan.handler)Scan.handler(code);else lookupCode(code,{auto:true});
 }
 
 /* ============================================================
@@ -1299,6 +1387,15 @@ function registerCur(st){CALC=null;
 const ACT={
   showVer(){alert('SSS v'+APP_VER+'（'+APP_DATE+'）\n\n'+CHANGELOG.join('\n\n'))},
   closeSheet(){closeSheet();render()},
+  regOpen(){regOpen()},
+  regScan(){if(Scan.on){stopScan();return}if(!regParams())return;startScan('#regCam',regCode).then(()=>{const b=$('#regScanBtn');if(b&&Scan.on)b.textContent='■ 読み取り停止'})},
+  regIsbn(){const v=normCode($('#rgIsbn').value);if(!/^\d{13}$/.test(v)&&!/^\d{8}$/.test(v)){toast('ISBN／JANを確認してください');return}$('#rgIsbn').value='';regCode(v)},
+  regManual(){const n=($('#rgName').value||'').trim();if(!n){toast('商品名を入力してください');return}const d=regDup('',n);if(d.length&&!confirm(`同じ巻がすでに在庫にあります（${d.map(x=>x.name).join('、')}）。それでも登録しますか？`))return;if(regAdd({title:n}))$('#rgName').value=''},
+  regPendOk(){const P=REG&&REG.pend;if(!P)return;REG.pend=null;regAdd(P);regPendShow()},
+  regPendManual(){const P=REG&&REG.pend;const n=(($('#rgPendName')||{}).value||'').trim();if(!P||!n){toast('商品名を入力してください');return}REG.pend=null;regAdd({code:P.code,title:n});regPendShow()},
+  regPendSkip(){if(REG)REG.pend=null;regPendShow()},
+  huntOpen(b){const e=S.hunt[+b.dataset.i];if(e)huntDetail(e)},
+  huntOpenKey(b){const e=S.hunt.find(x=>x.title===b.dataset.t);if(e)huntDetail(e)},
   key(b){if(!CUR){toast('先に本を調べてください');return}const k=b.dataset.k;let v=String(CUR.price??'');
     if(k==='C')v='';else if(k==='B')v=v.slice(0,-1);else if(v.length<7)v=(v==='0'?'':v)+k;CUR.price=v;updatePV();renderResult()},
   padToggle(){UI.padOpen=!UI.padOpen;renderPad()},
@@ -1376,7 +1473,7 @@ const ACT={
     const sum=importSedo(src,mode,{applySet:$('#sdSet').checked});$('#sdSum').innerHTML=sedoSumHTML(sum);toast(`${sum.added}件を取り込みました`)},
   csvOpen(){csvOpen(null,'')},
   async csvRun(){const txt=await readFT('cv');if(!txt.trim()){toast('CSVを選ぶか貼り付けてください');return}
-    let r;try{r=importCSV(txt,$('#cvT').value,$('#cvN').value,$('#cvS').value)}catch(e){toast(e.message);return}
+    let r;try{r=importCSV(txt,$('#cvTgt').value,$('#cvN').value,$('#cvS').value)}catch(e){toast(e.message);return}
     $('#cvSum').innerHTML=`<div class="card sum">取り込み先：<b class="ff">${esc(r.it.name)}</b>${r.created?'（新規作成）':''}<br>読み込んだ行 <b>${r.total}</b>／追加 <b>${r.add}</b>／重複除外 <b>${r.dup}</b>／読めない行 <b>${r.bad}</b></div>`;
     if(CUR&&!CUR.itemId&&r.created&&workKey(r.it.name)===workKey(CUR.title))CUR.itemId=null;
     toast(`${r.add}件を取り込みました`)}
@@ -1394,6 +1491,7 @@ document.addEventListener('keydown',e=>{
 });
 document.addEventListener('input',e=>{
   if(e.target.dataset.calc){const rows=calcRows();rows[+e.target.dataset.i][e.target.dataset.calc]=e.target.value;renderCalc();const el=document.querySelector('[data-calc="'+e.target.dataset.calc+'"][data-i="'+e.target.dataset.i+'"]');if(el){el.focus();const p=el.value.length;try{el.setSelectionRange(p,p)}catch(_){}}return}
+  if(e.target.id==='hq'){UI.hq=e.target.value;clearTimeout(UI.hqT);UI.hqT=setTimeout(()=>{const pos=e.target.selectionStart;render();const el=$('#hq');if(el){el.focus();try{el.setSelectionRange(pos,pos)}catch(_){}}},250);return}
   if(e.target.id==='lq'){UI.listQ=e.target.value;clearTimeout(UI.lqT);UI.lqT=setTimeout(()=>{const pos=e.target.selectionStart;render();const el=$('#lq');if(el){el.focus();try{el.setSelectionRange(pos,pos)}catch(_){}}},250)}
 });
 document.addEventListener('change',e=>{
@@ -1403,6 +1501,7 @@ document.addEventListener('change',e=>{
     const k=path[path.length-1];let v=el.type==='checkbox'?el.checked:el.value;
     if(el.type!=='checkbox'&&el.inputMode&&/numeric|decimal/.test(el.inputMode)&&k!=='budget'){const n=num(v);v=isFinite(n)?n:o[k]}
     o[k]=v;save();if(UI.tab!=='look')render();else renderResult();return}
+  if(el.id==='huntF'&&el.files&&el.files[0]){const f=el.files[0];el.value='';f.text().then(t=>{try{const r=huntImport(t);toast(`探し物リスト：追加${r.add}件・更新${r.upd}件（全${r.total}件）${r.bad?`・読めない行${r.bad}件`:''}`);render()}catch(err){toast(err.message||'読み込めません')}});return}
   if(el.dataset.lsel2!==undefined){UI.listSel[el.dataset.lsel2]=el.checked;render();return}
   if(el.dataset.lsel!==undefined){const v=el.value;const mp={genre:'listG',pub:'listP',cond:'listC',store:'listStore',setk:'listK',month:'listM'};const uk=mp[el.dataset.lsel];if(uk){UI[uk]=v;UI.listN=150;render()}return}
   if(el.dataset.qsel!==undefined){UI.cartSel[el.dataset.qsel]=el.checked;render();return}
