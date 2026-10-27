@@ -249,9 +249,11 @@ input[type="date"]{min-width:0;max-width:100%}
    データ: localStorage "sedoscope_s_v1"（SedoScope本体 "sedoscope_v1" とは別）
    外部通信: openBD ISBN照会のみ
    ============================================================ */
-const APP_VER='1.7.1';
+const APP_VER='1.7.3';
 const APP_DATE='2026-10-24';
 const CHANGELOG=[
+  'v1.7.3（2026-10-27）定型文はPOSTAに一本化し、SSSから定型文の画面（設定の管理・出品メモでの挿入/コピー）とPOSTA取り込み時の定型文の取り込みを外した（保存データ内の定型文はそのまま残し、使わない）。',
+  'v1.7.2（2026-10-27）調べる・一覧の検索欄で文字が打てなくなる不具合を修正（入力中は検索欄を作り直さず、結果リストだけを更新する）。',
   'v1.7.1（2026-10-27）調べる（探し物リスト）の見た目を整理：検索の直下にカテゴリ切り替え（選択は次回も保持）、作品名・上限価格・メモの強弱をはっきり。商品編集に「📷 KOMAで撮影」ボタンを追加。',
   'v1.7.0（2026-10-27）POSTAの出品メモ機能をSSSに内蔵：商品編集に「出品メモ」区画（タイトル・本文の自動生成とコピー、出品価格、定型文、値下げ限界ライン）。設定に「POSTAのバックアップを取り込む」と定型文の管理を追加。「POSTAで出品メモ」ボタンは廃止。',
   'v1.6.0（2026-10-27）収支・経費帳簿を追加（集計タブの「収支」：月ごとの売上・売上コスト・経費・純利益、12ヶ月の推移、経費の記録、収支CSV）。ステータス「取引中」を追加。商品と探し物リストにカテゴリ（本・コミック／トレカ／CD・音楽／古着／ゲーム／その他）を追加し、本専用の機能は本・コミックだけに効くようにした。',
@@ -300,7 +302,7 @@ function defSettings(){return{
   acc:{obi:10,cover:30,booklet:10,poster:5,other:0},
   store:'',stores:[],budget:'',autoQueue:false,postaUrl:'https://furumusx.github.io/posta/',komaUrl:'https://furumusx.github.io/KOMA/',huntCat:'',
 }}
-function defState(){return{schema:1,items:[],hunt:[],expenses:[],templates:defTemplates(),queue:[],biblio:{},settings:defSettings(),links:DEF_LINKS.map(x=>({...x})),
+function defState(){return{schema:1,items:[],hunt:[],expenses:[],queue:[],biblio:{},settings:defSettings(),links:DEF_LINKS.map(x=>({...x})),
   meta:{created:new Date().toISOString(),lastBackup:null,imports:[]}}}
 
 /* ---------- 保存 ---------- */
@@ -314,7 +316,7 @@ function fixState(s){
   s.settings=Object.assign(ds,ss,{ch,acc:Object.assign({},ds.acc,ss.acc||{})});
   s.links=Array.isArray(s.links)?s.links:d.links;
   s.hunt=Array.isArray(s.hunt)?s.hunt:[];
-  s.templates=Array.isArray(s.templates)?s.templates.filter(x=>x&&typeof x==='object'):defTemplates();
+  if(s.templates!==undefined&&!Array.isArray(s.templates))delete s.templates;   // v1.7.3：定型文はPOSTAへ一本化。古いデータの templates は残すが使わない
   s.expenses=Array.isArray(s.expenses)?s.expenses.filter(x=>x&&typeof x==='object'):[];
   for(const it of s.items)if(!it.cat)it.cat=BOOK;   // v1.6.0：既存アイテムは本・コミック
   s.meta=Object.assign(d.meta,s.meta||{});
@@ -664,8 +666,8 @@ function huntPage(){const L=S.hunt||[];
   const body=allCats.filter(c=>byCat[c]).map(c=>`${showCatHead?`<div class="sec">${esc(c)}（${byCat[c].length}）</div>`:''}${c===BOOK?pubGroups(byCat[c]):`<div class="card hcard">${byCat[c].map(row).join('')}</div>`}`).join('');
   return `<div class="srch"><input id="hq" type="search" placeholder="作品名・出版社・メモで絞り込み" value="${esc(UI.hq||'')}"></div>
   ${allCats.length>1?`<div class="fchips hcats">${[['','すべて',L.length],...allCats.map(c=>[c,c,L.filter(e=>catOf(e)===c).length])].map(([k,l,n])=>`<button class="${hc===k?'on':''}" data-act="huntCat" data-v="${esc(k)}">${esc(l)} ${n}</button>`).join('')}</div>`:''}
-  <div class="hinfo">📋 ${hit.length}${q?` / ${inCat}`:''}件<details class="hx"><summary>所持巻について</summary><div class="note">所持巻は、本・コミックの在庫（仕入済・出品中）から自動で計算しています。取引中・売却済は数えません。</div></details></div>
-  ${body||'<div class="empty">該当する作品はありません。</div>'}`}
+  <div class="hinfo">📋 <span id="hCnt">${hit.length}${q?` / ${inCat}`:''}</span>件<details class="hx"><summary>所持巻について</summary><div class="note">所持巻は、本・コミックの在庫（仕入済・出品中）から自動で計算しています。取引中・売却済は数えません。</div></details></div>
+  <div id="huntRes">${body||'<div class="empty">該当する作品はありません。</div>'}</div>`}
 function huntHTML(){const L=S.hunt||[];if(!L.length)return `<details class="card hunt-acc"><summary>📋 探し物リスト（未登録）</summary><div class="note mt2">設定タブの「探し物リストを取り込む」で読み込むと、ここに出版社ごとに表示されます。</div></details>`;
   const groups={};L.forEach((e,i)=>{const k=e.publisher||'（出版社なし）';(groups[k]=groups[k]||[]).push([e,i])});
   const fresh=num(S.settings.fresh)||30;
@@ -1050,7 +1052,7 @@ function listHTML(){
   const memCnt={};for(const i of S.items)if(i.inSet)memCnt[i.inSet]=(memCnt[i.inSet]||0)+1;
   const selN=Object.keys(UI.listSel).filter(k=>UI.listSel[k]).length;
   const shown=arr.slice(0,UI.listN);
-  return `<div class="srch"><input id="lq" type="search" placeholder="タイトル・ISBN・タグ・店舗で絞り込み" value="${esc(UI.listQ)}"><button class="btn ${UI.listSelMode?'pri':''}" data-act="listSelMode">${UI.listSelMode?'選択中':'選択'}</button><button class="btn" data-act="regOpen">📷 読み取りで追加</button><button class="btn pri" data-act="newItem">＋新規</button></div>
+  return `<div class="srch"><input id="lq" type="search" placeholder="タイトル・ISBN・タグ・店舗で絞り込み" value="${esc(UI.listQ)}"><button class="btn ${UI.listSelMode?'pri':''}" data-act="listSelMode">${UI.listSelMode?'選択中':'選択'}</button><button class="btn" data-act="regOpen">📷 読み取りで追加</button><button class="btn pri" data-act="newItem">＋新規</button></div><div id="listRes">
   <div class="fchips">${[['all','全部'],['cand','候補'],['stock','仕入済'],['listed','出品中'],['deal','取引中'],['sold','売却済'],['re','再調査']].map(([k,l])=>`<button class="${f===k?'on':''}" data-act="listF" data-v="${k}">${l}${k!=='re'?' '+cnt(k):''}</button>`).join('')}</div>
   ${(()=>{const af=[['カテゴリ',UI.listCat,'listCat'],['ジャンル',UI.listG,'listG'],['出版社',UI.listP,'listP'],['状態',UI.listC,'listC'],['仕入店舗',UI.listStore,'listStore'],['区分',UI.listK,'listK'],['仕入月',UI.listM,'listM']].filter(x=>x[1]);return `<div class="selfrow"><button class="btn sm" data-act="listFilterOpen">絞り込み${af.length?`（${af.length}）`:''}</button>${af.map(([lb,v,k])=>`<span class="chip">${lb}：${esc(v)} <a href="#" data-act="listFilterClear" data-k="${k}">✕</a></span>`).join('')}</div>`})()}
   ${f==='re'?'<div class="note mb2">最新の売り切れから'+esc(S.settings.fresh)+'日を超えた（または日付不明の）作品です。相場を取り直して取り込んでください。</div>':''}
@@ -1060,7 +1062,7 @@ function listHTML(){
     else{const {p,a}=expectProfit(it);right=`<div class="note">${isFinite(p)?'見込み利益':'仕入上限'}</div><div class="num">${isFinite(p)?yenT(p):yenT(a.best&&a.best.max)}</div>`}
     return `<div class="it stc-${it.st}" data-act="openItem" data-id="${esc(it.id)}">${UI.listSelMode?`<input type="checkbox" class="qchk" data-lsel2="${esc(it.id)}" ${UI.listSel[it.id]?'checked':''}>`:''}${thumb(it)}<div class="m"><div class="t">${esc(it.name||'(無題)')}</div>
       <div class="s"><span class="st ${it.st}">${ST[it.st]||esc(it.st)}</span>${esc([isBook(it)?'':catOf(it),it.pub,it.genre,it.cond,it.cost!==''&&it.cost!=null?'仕入'+yenT(num(it.cost)):'',it.store,memCnt[it.id]?'束ね'+memCnt[it.id]+'冊':''].filter(Boolean).join('・'))}</div></div><div class="r">${right}</div></div>`}).join('')||'<div class="empty">該当する商品はありません。</div>'}</div>
-  ${arr.length>shown.length?`<button class="btn" style="width:100%" data-act="more">さらに表示（残り${arr.length-shown.length}件）</button>`:''}${UI.listSelMode&&selN>=1?`<div style="height:64px"></div><div class="selbar"><span class="grow">${selN}冊 選択中</span>${selN>=2?'<button class="btn pri sm" data-act="listBundle">セットとして束ねる</button>':''}<button class="btn sm" data-act="listSelClear">解除</button></div>`:''}`;
+  ${arr.length>shown.length?`<button class="btn" style="width:100%" data-act="more">さらに表示（残り${arr.length-shown.length}件）</button>`:''}${UI.listSelMode&&selN>=1?`<div style="height:64px"></div><div class="selbar"><span class="grow">${selN}冊 選択中</span>${selN>=2?'<button class="btn pri sm" data-act="listBundle">セットとして束ねる</button>':''}<button class="btn sm" data-act="listSelClear">解除</button></div>`:''}</div>`;
 }
 
 /* ---------- 商品編集 ---------- */
@@ -1260,21 +1262,7 @@ function pnlCsv(){const y=(UI.pnlM||curYM()).slice(0,4);const rows=[];
 /* ---------- 出品メモ（v1.7.0：POSTAから移植） ---------- */
 const POINTS=['ヤケあり','スレあり','小口の汚れ','折れあり','書き込みあり','特になし（きれい）'];
 const KIND={set:'全巻セット',partial:'途中セット',single:'単巻',bara:'バラ（複数冊まとめ）'};
-function defTemplates(){const P=[
-  ['購入の挨拶','購入させていただきました。お取引が完了するまで、よろしくお願いいたします。'],
-  ['購入お礼＋発送予定','この度は {商品名} をご購入いただき、ありがとうございます。{今日}〜2日以内に発送いたします。発送後に改めてご連絡しますので、よろしくお願いいたします。'],
-  ['発送完了の連絡','発送が完了しましたのでご連絡いたします。お手元に届くまで今しばらくお待ちください。よろしくお願いいたします。'],
-  ['値下げ交渉へのお返事（受ける）','コメントありがとうございます。ご提示の金額でお譲りできますので、価格を変更いたしました。ご検討よろしくお願いいたします。'],
-  ['値下げ交渉へのお返事（断る）','コメントありがとうございます。申し訳ありませんが、{商品名} は現在の価格が限界のため、値下げはお受けできません。ご理解いただけますと幸いです。'],
-  ['バラ売りについて','コメントありがとうございます。申し訳ありませんが、こちらはセットでの販売のみとなっております。バラ売りは行っておりませんので、ご了承ください。'],
-  ['帯・初版の質問への回答','コメントありがとうございます。帯・初版の有無については、商品写真と説明文に記載の通りとなります。追加の写真が必要でしたらお知らせください。'],
-  ['受取評価のお願い','無事に届きましたでしょうか。問題がなければ、受取評価をよろしくお願いいたします。こちらも届き次第、評価させていただきます。'],
-  ['取引完了のお礼','受取評価ありがとうございました。こちらも評価させていただきました。またご縁がありましたら、よろしくお願いいたします。'],
-  ['受け取りました','商品を受け取りました。迅速で丁寧なご対応をありがとうございました。またご縁がありましたら、よろしくお願いいたします。']];
-  return P.map(([n,b],i)=>({id:'t'+i+Math.random().toString(36).slice(2,6),name:n,body:b}))}
 function todayJ(){const d=new Date();return `${d.getMonth()+1}月${d.getDate()}日`}
-function fillTpl(body,e){return String(body||'').replace(/\{今日\}/g,todayJ()).replace(/\{商品名\}/g,(e&&(e.listTitle||e.name))||'')
-  .replace(/\{価格\}/g,e&&num(e.listPrice)>0?'¥'+num(e.listPrice).toLocaleString('ja-JP'):'').replace(/\{状態\}/g,(e&&e.cond)||'')}
 // ---- 生成ロジック（POSTA の確定仕様をそのまま移植） ----
 function volsList(s){return String(s||'').normalize('NFKC').split(/[,、\s]+/).map(x=>x.replace(/巻/g,'').trim()).filter(Boolean)}
 function volsText(s){const a=volsList(s);return a.length?a.join('巻・'):''}
@@ -1387,7 +1375,7 @@ function limitHTML(e){const chs=CH.filter(c=>S.settings.ch[c].on);if(!chs.length
   ${LIM_LV.map(lv=>`<tr><td>${lv?`利益率${lv}%`:'損益分岐'}</td>${chs.map(c=>{const p=limitPrice(e,c,lv);return `<td class="num${p!=null&&lp>0&&lp<p?' wn':''}">${p==null?'—':yenT(p)}</td>`}).join('')}</tr>`).join('')}
   ${lp>0?`<tr><td>出品価格での利益</td>${chs.map(c=>{const pr=soldProfit(Object.assign({},e,{soldPrice:lp,soldCh:c,soldFee:'',soldShip:'',soldPack:'',soldOther:''}));return `<td class="num">${yenT(pr)}<br><span class="mut">${pct(pr/lp)}</span></td>`}).join('')}</tr>`:''}</table>
   <div class="note mt1">この価格まで下げても、その利益率を保てる下限です（原価・送料・梱包費・その他費用と各販路の手数料率から計算。10円単位）。${lp>0?'出品価格がラインを下回る欄は色付きで表示。':''}</div>`}
-function memoHTML(e){const book=isBook(e);const tpls=S.templates||[];
+function memoHTML(e){const book=isBook(e);
   return `<div class="edsec"><div class="edh">出品メモ</div>
   ${book?genPanelHTML(e):'<div class="note mb2">本・コミック以外の商品は、タイトル・本文を手入力してください（自動生成は本・コミックのみ）。</div>'}
   <div class="fld"><label>出品タイトル</label><input data-f="listTitle" value="${esc(e.listTitle||'')}"><div class="note" id="ltC"></div></div>
@@ -1395,16 +1383,7 @@ function memoHTML(e){const book=isBook(e);const tpls=S.templates||[];
   <div class="btns"><button class="btn sm" data-act="memoCopy" data-w="t">タイトルをコピー</button><button class="btn sm" data-act="memoCopy" data-w="b">本文をコピー</button><button class="btn sm" data-act="memoCopy" data-w="both">両方コピー</button></div>
   <div class="btns mt3"><button class="btn" data-act="komaItem">📷 KOMAで撮影</button></div><div class="note mt1">この商品の情報（商品名・巻・初版/帯/特典/状態）を付けてKOMAを開きます。写真はKOMA側に残ります。</div>
   <div class="fld mt3"><label>出品価格</label><input data-f="listPrice" inputmode="numeric" value="${esc(e.listPrice??'')}"></div>
-  <div class="gsec">定型文</div>${tpls.length?`<div class="fld"><select id="tplSel">${tpls.map(t=>`<option value="${esc(t.id)}">${esc(t.name||'（名前なし）')}</option>`).join('')}</select></div>
-  <div class="btns"><button class="btn sm" data-act="tplIns">本文に挿入</button><button class="btn sm" data-act="tplCopy">コピー</button></div>`:'<div class="note">定型文がありません。</div>'}
-  <div class="note mt1">定型文の追加・編集・削除は設定タブの「定型文」で行えます。</div>
   <div class="gsec">値下げ限界ライン</div><div id="limBox">${limitHTML(e)}</div></div>`}
-function tplSheet(id){const t=id?S.templates.find(x=>x.id===id):null;if(id&&!t){toast('定型文が見つかりません');return}
-  openSheet(t?'定型文を編集':'定型文を追加',`<div class="fld"><label>名前</label><input id="tpN" value="${esc(t?t.name:'')}"></div>
-  <div class="fld"><label>本文</label><textarea id="tpB" style="min-height:200px">${esc(t?t.body:'')}</textarea></div>
-  <div class="tchips">${['{商品名}','{価格}','{状態}','{今日}'].map(v=>`<button data-act="tplVar" data-v="${v}">${v}</button>`).join('')}</div>
-  <div class="note">変数をタップすると本文のカーソル位置に入ります。出品メモで挿入・コピーするとき、その商品の出品タイトル（無ければ商品名）・出品価格・状態・今日の日付に置き換わります。</div>
-  <div class="btns mt3"><button class="btn pri" data-act="tplSave" data-id="${t?esc(t.id):''}">保存</button>${t?`<button class="btn dng" data-act="tplDel" data-id="${esc(t.id)}">削除</button>`:''}<button class="btn" data-act="closeSheet">やめる</button></div>`)}
 // ---- POSTA バックアップの取り込み ----
 let POSTA_IMP=null;
 function postaCond(c){c=String(c||'').trim();if(!c)return '';if(c==='全体的に状態が悪い')return '状態が悪い';if(c==='新品、未使用')return '新品・未使用';return c}
@@ -1412,12 +1391,11 @@ function postaParse(txt){let o=JSON.parse(txt);if(o&&o.data&&!Array.isArray(o.li
   if(!o||typeof o!=='object'||(!Array.isArray(o.listings)&&!Array.isArray(o.templates)))throw new Error('POSTAのバックアップではありません');
   const L=(Array.isArray(o.listings)?o.listings:[]).filter(l=>l&&typeof l==='object');const T=(Array.isArray(o.templates)?o.templates:[]).filter(t=>t&&typeof t==='object');
   return{L,T}}
-function postaPlan(d){let merged=0,added=0,tpl=0;const seen=new Set((S.templates||[]).map(t=>(t.name||'')+'\u0000'+(t.body||'')));
-  for(const l of d.L){const it=(l.sssId&&getItem(l.sssId))||S.items.find(x=>x.postaId&&x.postaId===l.id);if(it)merged++;else added++}
-  for(const t of d.T){const k=String(t.title||t.name||'')+'\u0000'+String(t.body||'');if(!seen.has(k)){seen.add(k);tpl++}}return{merged,added,tpl}}
+function postaPlan(d){let merged=0,added=0;
+  for(const l of d.L){const it=(l.sssId&&getItem(l.sssId))||S.items.find(x=>x.postaId&&x.postaId===l.id);if(it)merged++;else added++}return{merged,added}}
 function postaImportAsk(txt){const d=postaParse(txt);const r=postaPlan(d);POSTA_IMP=d;
-  openSheet('POSTAのバックアップを取り込む',`<div class="card"><table><tr><td>SSSの商品に付ける出品メモ</td><td class="num">${r.merged}件</td></tr><tr><td>「候補」として新しく入れる出品メモ</td><td class="num">${r.added}件</td></tr><tr><td>追加する定型文（同じものは除く）</td><td class="num">${r.tpl}件</td></tr></table>
-  <div class="note mt2">出品メモの タイトル・本文・出品価格・生成の入力 を取り込みます。売却記録・計算履歴は取り込みません。在庫・相場・帳簿は変わりません。</div></div>
+  openSheet('POSTAのバックアップを取り込む',`<div class="card"><table><tr><td>SSSの商品に付ける出品メモ</td><td class="num">${r.merged}件</td></tr><tr><td>「候補」として新しく入れる出品メモ</td><td class="num">${r.added}件</td></tr></table>
+  <div class="note mt2">出品メモの タイトル・本文・出品価格・生成の入力 を取り込みます。定型文・売却記録・計算履歴は取り込みません（定型文は新しいPOSTAで使います）。在庫・相場・帳簿は変わりません。</div></div>
   <div class="btns mt3"><button class="btn pri" data-act="postaImpDo">取り込む</button><button class="btn" data-act="closeSheet">やめる</button></div>`)}
 function postaImportApply(d){let merged=0,added=0,tpl=0;const nz=v=>v!==undefined&&v!==null&&String(v).trim()!=='';
   for(const l of d.L){let it=(l.sssId&&getItem(l.sssId))||S.items.find(x=>x.postaId&&x.postaId===l.id);const price=num(l.price);
@@ -1427,9 +1405,7 @@ function postaImportApply(d){let merged=0,added=0,tpl=0;const nz=v=>v!==undefine
       it=newItem({name:String(l.title||(gen&&gen.work)||'（POSTAの出品メモ）'),st:'cand',cat:BOOK,date:d0,listTitle:String(l.title||''),listDesc:String(l.desc||''),listPrice:price>0?price:'',
         cost:num(l.cost)>0?num(l.cost):'',cond:postaCond(l.condition),author:gen?String(gen.author||''):'',pub:gen?String(gen.publisher||''):'',code:gen?String(gen.isbn||''):'',memo:String(l.note||''),postaId:String(l.id||'')});
       if(gen)it.gen=gen;S.items.unshift(it);added++}}
-  const seen=new Set((S.templates||[]).map(t=>(t.name||'')+'\u0000'+(t.body||'')));
-  for(const t of d.T){const name=String(t.title||t.name||''),body=String(t.body||'');const k=name+'\u0000'+body;if(seen.has(k))continue;seen.add(k);S.templates.push({id:uid(),name,body,cat:String(t.category||'')});tpl++}
-  save();return{merged,added,tpl}}
+  save();return{merged,added}}
 
 // ---- KOMA へ（v1.7.1）：KOMA の URL 取り込み（src=sss）で受ける。sssId で KOMA 側の二重登録を防ぐ ----
 function komaParams(e){const g=isBook(e)?ensureGen(e):(e.gen||{});const acc=e.acc||{};
@@ -1470,10 +1446,8 @@ function setHTML(){
   ${S.links.map((l,i)=>`<div class="fld"><div class="row"><input data-link="${i}" data-k="name" value="${esc(l.name)}" class="grow"><button class="btn sm" data-act="linkUp" data-i="${i}">↑</button><button class="btn sm dng" data-act="linkDel" data-i="${i}">削除</button></div><input data-link="${i}" data-k="url" value="${esc(l.url)}" class="mt1"></div>`).join('')}
   <div class="btns"><button class="btn" data-act="linkAdd">＋ボタンを追加</button><button class="btn" data-act="linkReset">初期のボタンに戻す</button></div>
   <div class="note mt2">リンクは外部サイトを開くだけで、データの自動取得はしません。</div></div>
-  <div class="sec">定型文（出品メモで使います）</div><div class="card">${(S.templates||[]).map(t=>`<div class="qrow" data-act="tplOpen" data-id="${esc(t.id)}" style="cursor:pointer"><span class="grow"><b>${esc(t.name||'（名前なし）')}</b><br><span class="mut">${esc(String(t.body||'').slice(0,40))}${String(t.body||'').length>40?'…':''}</span></span><span>›</span></div>`).join('')||'<div class="note">定型文はありません</div>'}
-  <div class="btns mt2"><button class="btn" data-act="tplOpen">＋定型文を追加</button></div><div class="note mt1">{商品名} {価格} {状態} {今日} が使えます（出品メモで挿入・コピーするときに置き換わります）。</div></div>
   <div class="sec">KOMA連携</div><div class="card"><div class="fld"><label>KOMAのURL（商品編集の「📷 KOMAで撮影」で開きます）</label>${inp('komaUrl',s.komaUrl)}</div></div>
-  <div class="sec">POSTAから移行</div><div class="card"><div class="note mb2">旧POSTAの「データ」→書き出し で保存したバックアップ（posta_backup_*.json）を読み込み、出品メモと定型文をSSSに移します。売却記録・計算履歴は取り込みません。在庫・相場・帳簿のデータは変わりません。</div>
+  <div class="sec">POSTAから移行</div><div class="card"><div class="note mb2">旧POSTAの「データ」→書き出し で保存したバックアップ（posta_backup_*.json）を読み込み、出品メモをSSSに移します（定型文は新しいPOSTAで使うため移しません）。売却記録・計算履歴も取り込みません。在庫・相場・帳簿のデータは変わりません。</div>
   <label class="btn">📥 POSTAのバックアップを取り込む<input type="file" id="postaF" accept=".json,application/json,text/plain" hidden></label></div>
   <div class="sec">データ</div><div class="card sum">
   商品 <b>${S.items.length}</b> 件／相場 <b>${qn}</b> 件／カゴ <b>${S.queue.length}</b> 件<br>
@@ -1783,17 +1757,7 @@ const ACT={
   memoCopy(b){readEditor();const t=String(EDIT.listTitle||''),d=String(EDIT.listDesc||'');const w=b.dataset.w;const v=w==='t'?t:w==='b'?d:[t,d].filter(Boolean).join('\n\n');if(!v){toast('コピーする内容がありません');return}copyText(v)},
   tagTog(b){readEditor();const g=EDIT.gen;const t=b.dataset.t;let a=tagList(g.tags);a=a.includes(t)?a.filter(x=>x!==t):[...a,t];g.tags=a.join(' ');const i=document.querySelector('[data-g="tags"]');if(i)i.value=g.tags;updGen()},
   genReset(){if(!confirm('生成パネルの入力を、商品の情報から作り直しますか？'))return;readEditor();EDIT.gen=genDefault(EDIT);drawEditorKeep()},
-  tplIns(){const t=S.templates.find(x=>x.id===($('#tplSel')||{}).value);if(!t){toast('定型文を選んでください');return}readEditor();const ta=document.querySelector('#shB [data-f="listDesc"]');const v=fillTpl(t.body,EDIT);
-    const s0=ta.selectionStart??ta.value.length,e0=ta.selectionEnd??s0;const at=document.activeElement===ta?s0:ta.value.length;const pre=ta.value.slice(0,at),post=ta.value.slice(document.activeElement===ta?e0:at);
-    ta.value=pre+(pre&&!pre.endsWith('\n')?'\n':'')+v+post;EDIT.listDesc=ta.value;toast('本文に挿入しました')},
-  tplCopy(){const t=S.templates.find(x=>x.id===($('#tplSel')||{}).value);if(!t){toast('定型文を選んでください');return}readEditor();copyText(fillTpl(t.body,EDIT))},
-  tplOpen(b){tplSheet(b.dataset.id||null)},
-  tplSave(b){const name=$('#tpN').value.trim(),body=$('#tpB').value;if(!name&&!body.trim()){toast('名前か本文を入力してください');return}
-    const id=b.dataset.id;if(id){const t=S.templates.find(x=>x.id===id);if(t)Object.assign(t,{name:name||body.trim().slice(0,16),body,updated:new Date().toISOString()})}
-    else S.templates.push({id:uid(),name:name||body.trim().slice(0,16),body,created:new Date().toISOString()});save();closeSheet();render();toast('定型文を保存しました')},
-  tplDel(b){const t=S.templates.find(x=>x.id===b.dataset.id);if(!t||!confirm(`定型文「${t.name}」を削除しますか？`))return;S.templates=S.templates.filter(x=>x!==t);save();closeSheet();render();toast('削除しました')},
-  tplVar(b){const ta=$('#tpB');const s0=ta.selectionStart??ta.value.length,e0=ta.selectionEnd??s0;ta.value=ta.value.slice(0,s0)+b.dataset.v+ta.value.slice(e0);ta.focus();const q=s0+b.dataset.v.length;ta.setSelectionRange(q,q)},
-  postaImpDo(){if(!POSTA_IMP)return;const r=postaImportApply(POSTA_IMP);POSTA_IMP=null;closeSheet();render();toast(`POSTAから取り込みました：既存商品に${r.merged}件・候補として${r.added}件・定型文${r.tpl}件`)},
+  postaImpDo(){if(!POSTA_IMP)return;const r=postaImportApply(POSTA_IMP);POSTA_IMP=null;closeSheet();render();toast(`POSTAから取り込みました：既存商品に${r.merged}件・候補として${r.added}件`)},
   judgeItem(){const e=saveEditor();if(!e)return;closeSheet();setTab('look');CUR={code:normCode(e.code),itemId:e.id,title:e.name,author:e.author||'',pub:e.pub||'',cover:itemCover(e),price:''};renderCalc();renderResult();updatePV();focusRes()},
   delItem(){if(!EDIT||!confirm(`「${EDIT.name}」を削除しますか？（相場${(EDIT.quotes||[]).length}件も消えます）`))return;S.items=S.items.filter(x=>String(x.id)!==String(EDIT.id));save();closeSheet();toast('削除しました');render()},
   statsAxis(b){UI.statsAxis=b.dataset.v;render()},
@@ -1832,6 +1796,8 @@ const ACT={
     if(CUR&&!CUR.itemId&&r.created&&workKey(r.it.name)===workKey(CUR.title))CUR.itemId=null;
     toast(`${r.add}件を取り込みました`)}
 };
+// v1.7.2：検索入力中は入力欄を作り直さず、結果部分だけ差し替える（日本語変換が壊れないように）
+function partial(html,ids){const t=document.createElement('div');t.innerHTML=html;for(const id of ids){const cur=document.getElementById(id),nw=t.querySelector('#'+id);if(cur&&nw)cur.innerHTML=nw.innerHTML}}
 function drawEditorKeep(){const y=$('#shB').scrollTop;drawEditor();$('#shB').scrollTop=y}
 
 document.addEventListener('click',e=>{
@@ -1852,8 +1818,8 @@ document.addEventListener('input',e=>{
   if(EDIT&&e.target.dataset.f==='listTitle'){updLtCount();return}
   if(EDIT&&['cost','ship','pack','other','listPrice'].includes(e.target.dataset.f)){readEditor();const lb=$('#limBox');if(lb)lb.innerHTML=limitHTML(EDIT);return}
   if(e.target.dataset.calc){const rows=calcRows();rows[+e.target.dataset.i][e.target.dataset.calc]=e.target.value;renderCalc();const el=document.querySelector('[data-calc="'+e.target.dataset.calc+'"][data-i="'+e.target.dataset.i+'"]');if(el){el.focus();const p=el.value.length;try{el.setSelectionRange(p,p)}catch(_){}}return}
-  if(e.target.id==='hq'){UI.hq=e.target.value;clearTimeout(UI.hqT);UI.hqT=setTimeout(()=>{const pos=e.target.selectionStart;render();const el=$('#hq');if(el){el.focus();try{el.setSelectionRange(pos,pos)}catch(_){}}},250);return}
-  if(e.target.id==='lq'){UI.listQ=e.target.value;clearTimeout(UI.lqT);UI.lqT=setTimeout(()=>{const pos=e.target.selectionStart;render();const el=$('#lq');if(el){el.focus();try{el.setSelectionRange(pos,pos)}catch(_){}}},250)}
+  if(e.target.id==='hq'){UI.hq=e.target.value;if(UI.tab==='look')partial(huntPage(),['huntRes','hCnt']);return}
+  if(e.target.id==='lq'){UI.listQ=e.target.value;UI.listN=150;if(UI.tab==='list')partial(listHTML(),['listRes']);return}
 });
 document.addEventListener('change',e=>{
   const el=e.target;
