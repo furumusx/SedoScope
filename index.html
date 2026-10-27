@@ -200,6 +200,12 @@ label.pick{position:relative;overflow:hidden}label.pick input{position:absolute;
 .selbar .grow{font-size:13px}
 .grid2>.fld,.grid3>.fld{min-width:0}
 .fld input,.fld select,.fld textarea{min-width:0;max-width:100%}
+/* v1.7.4：iPhoneの日付欄は中身の幅で広がり、2列の枠からはみ出すため、見た目を素の入力にそろえて幅を固定する */
+.fld input[type=date],.fld input[type=time]{-webkit-appearance:none;appearance:none;display:block;width:100%;min-width:0;max-width:100%;line-height:var(--h-input);text-align:left}
+.fld input[type=date]::-webkit-date-and-time-value{text-align:left;min-width:0}
+.fld select{-webkit-appearance:none;appearance:none;text-overflow:ellipsis;white-space:nowrap;overflow:hidden;padding-right:28px;background-image:linear-gradient(45deg,transparent 50%,var(--mut) 50%),linear-gradient(135deg,var(--mut) 50%,transparent 50%);background-position:calc(100% - 15px) 50%,calc(100% - 10px) 50%;background-size:5px 5px,5px 5px;background-repeat:no-repeat}
+.grid2>*,.grid3>*{min-width:0;max-width:100%}
+.edsec{min-width:0;overflow-x:hidden}
 input[type="date"]{min-width:0;max-width:100%}
 .fld label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .grid2,.grid3{align-items:start}
@@ -249,9 +255,10 @@ input[type="date"]{min-width:0;max-width:100%}
    データ: localStorage "sedoscope_s_v1"（SedoScope本体 "sedoscope_v1" とは別）
    外部通信: openBD ISBN照会のみ
    ============================================================ */
-const APP_VER='1.7.3';
+const APP_VER='1.7.4';
 const APP_DATE='2026-10-24';
 const CHANGELOG=[
+  'v1.7.4（2026-10-27）商品編集を整理：想定売価の手入力を廃止（相場からの自動推定のみ）、出品・売却を「出品価格・出品日／売却価格・売却日／売却販路」に、実際の手数料の欄を外した（入力済みの過去の値は計算に使い続ける）。2列の入力枠（特に日付）が枠からはみ出す問題を修正。',
   'v1.7.3（2026-10-27）定型文はPOSTAに一本化し、SSSから定型文の画面（設定の管理・出品メモでの挿入/コピー）とPOSTA取り込み時の定型文の取り込みを外した（保存データ内の定型文はそのまま残し、使わない）。',
   'v1.7.2（2026-10-27）調べる・一覧の検索欄で文字が打てなくなる不具合を修正（入力中は検索欄を作り直さず、結果リストだけを更新する）。',
   'v1.7.1（2026-10-27）調べる（探し物リスト）の見た目を整理：検索の直下にカテゴリ切り替え（選択は次回も保持）、作品名・上限価格・メモの強弱をはっきり。商品編集に「📷 KOMAで撮影」ボタンを追加。',
@@ -517,7 +524,7 @@ function analyze(ctx){
   else if(prov){const tr=volRangeOfName(title);if(tr){const rq=rangeQuotes(key,tr[0],tr[1]);if(rq.some(q=>q.status==='sold')){qs=rq;grp='range'}}}
   const st=qstats(qs),acc=accFactor(it);
   const chs=[];let memMiss=false;
-  for(const c of CH){const cs=set.ch[c];if(!cs.on)continue;let base=NaN,basis='';const man=it?num(it['p'+c]):NaN;
+  for(const c of CH){const cs=set.ch[c];if(!cs.on)continue;let base=NaN,basis='';const man=NaN;   // v1.7.4：想定売価の手入力は使わない（相場からの自動推定のみ）
     if(man>0){base=man;basis='手入力の想定価格'}
     else if(it&&it.mixed){const mem=S.items.filter(m=>m.inSet===it.id);let sum=0,n=0,miss=0;
       if((ctx._d||0)<4)for(const m of mem){const am=analyze({itemId:m.id,_d:(ctx._d||0)+1});const mc=am.chs.find(x=>x.c===c);if(mc&&mc.sale>0){sum+=mc.sale;n++}else miss++}
@@ -526,8 +533,7 @@ function analyze(ctx){
       const src=own.length?cs.name:'全販路';
       if(arr.length>=3){const bd=modeBand(arr);base=set.mode==='cons'?bd.lo:Math.floor(bd.avg/10)*10;
         basis=`最頻価格帯の${set.mode==='cons'?'下限':'平均'}（帯 ${bd.lo.toLocaleString('ja-JP')}〜${bd.hi.toLocaleString('ja-JP')}円に${bd.n}件）・${src}の売り切れ${arr.length}件`}
-      else if(arr.length){base=set.mode==='cons'?Math.min(...arr):median(arr);basis=(set.mode==='cons'?'底値':'中央値')+'・'+`${src}の売り切れ${arr.length}件`}
-      else if(it&&num(it.lo)>0){const lo=num(it.lo),hi=num(it.hi)>0?num(it.hi):lo;base=set.mode==='cons'?lo:Math.round((lo+hi)/2);basis='登録済みの想定価格（下限/上限）'}}
+      else if(arr.length){base=set.mode==='cons'?Math.min(...arr):median(arr);basis=(set.mode==='cons'?'底値':'中央値')+'・'+`${src}の売り切れ${arr.length}件`}}
     if(!(base>0))continue;
     const sale=Math.round(base*acc.f),fee=Math.round(sale*(num(cs.fee)||0)/100);
     const ship=fnum(it,'ship',num(cs.ship)||0),pack=fnum(it,'pack',num(set.pack)||0),other=fnum(it,'other',num(set.other)||0);
@@ -1075,10 +1081,8 @@ const FIELDS=[
   ['費用（空欄は既定値）'],
   ['cost','仕入価格','num'],['ship','発送料','num'],['pack','梱包費','num'],['other','その他費用・仕入送料','num'],
   ['store','仕入店舗','sel'],['date','仕入日','date'],
-  ['想定売価（手入力すると相場より優先）'],
-  ['pm','メルカリ','num'],['py','Yahoo!フリマ','num'],['pr','ラクマ','num'],['pa','ヤフオク','num'],['lo','想定 下限','num'],['hi','想定 上限','num'],
   ['出品・売却'],
-  ['listDate','出品日','date'],['soldPrice','売却価格','num'],['soldDate','売却日','date'],['soldCh','売却販路','ch'],['soldFee','実際の手数料','num'],
+  ['listPrice','出品価格','num'],['listDate','出品日','date'],['soldPrice','売却価格','num'],['soldDate','売却日','date'],['soldCh','売却販路','ch'],
   ['メモ'],
   ['tags','タグ','text'],['memo','メモ','area']
 ];
@@ -1108,7 +1112,7 @@ function selOpts(k,cur){let base=[];
   const all=[...new Set([...base,...used])];
   if(cur&&!all.includes(String(cur)))all.push(String(cur));
   return ['',...all]}
-const HALF=new Set(['author','pub','cat','genre','cond','st','setk','vols','range','have','cost','ship','pack','other','store','date','prints','pm','py','pr','pa','lo','hi','listPrice','listDate','soldPrice','soldDate','soldCh','soldFee']);
+const HALF=new Set(['author','pub','cat','genre','cond','st','setk','vols','range','have','cost','ship','pack','other','store','date','prints','pm','py','pr','pa','lo','hi','listPrice','listDate','soldPrice','soldDate','soldFee']);
 function drawEditor(){
   const e=EDIT;let h='';let secOpen=false;const halfBuf=[];
   const flushHalf=()=>{while(halfBuf.length){h+=`<div class="grid2">${halfBuf.splice(0,2).join('')}</div>`}};
@@ -1142,7 +1146,7 @@ function drawEditor(){
   <div class="grid2"><div class="fld"><label>状態</label><input id="nqD" placeholder="目立った傷なし 等"></div><div class="fld"><label>確認日</label><input id="nqT" type="date" value="${today()}"></div></div>
   <div class="btns"><button class="btn" data-act="addQuote">相場を追加</button><button class="btn" data-act="csvForEdit">相場CSVを取り込む</button></div>
   <div class="mt2">${qs.slice(0,80).map(q=>`<div class="qrow"><span>${q.status==='sold'?'売切':q.status==='listing'?'出品中':'不明'}・${esc(q.ch&&q.ch!=='o'?S.settings.ch[q.ch].name:q.src||'')}・${esc(q.cond||'')}<br><span class="mut">${esc(q.title||'')}</span></span><span class="num">${yenT(q.price)}<br><span class="mut">${esc(q.date||'')}</span></span></div>`).join('')}${qs.length>80?`<div class="note">ほか${qs.length-80}件</div>`:''}</div></div>`;
-  const extra=Object.keys(e).filter(k=>!FIELDS.some(f=>f[0]===k)&&!['id','quotes','acc','created','_isNew','cover','autoBundle','inSet','listTitle','listDesc','listPrice','gen','postaId'].includes(k)&&!k.startsWith('_'));
+  const extra=Object.keys(e).filter(k=>!FIELDS.some(f=>f[0]===k)&&!['id','quotes','acc','created','_isNew','cover','autoBundle','inSet','listTitle','listDesc','listPrice','gen','postaId','pm','py','pr','pa','lo','hi','soldFee','soldShip','soldPack','soldOther'].includes(k)&&!k.startsWith('_'));
   if(extra.length)h+=`<div class="note mt3">その他の保存項目（表示のみ・そのまま保持）：${esc(extra.join(', '))}</div>`;
   h+=`<div class="btns edfoot"><button class="btn pri" data-act="saveItem">保存</button>${e._isNew?'':`<button class="btn dng" data-act="delItem">削除</button>`}</div>`;
   openSheet(e._isNew?'新規商品':(e.name||'商品'),h);updGen();updLtCount();
@@ -1816,7 +1820,7 @@ document.addEventListener('input',e=>{
       syncWork(g);const wi=document.querySelector('[data-g="work"]');if(wi&&document.activeElement!==wi)wi.value=g.work}
     updGen();return}
   if(EDIT&&e.target.dataset.f==='listTitle'){updLtCount();return}
-  if(EDIT&&['cost','ship','pack','other','listPrice'].includes(e.target.dataset.f)){readEditor();const lb=$('#limBox');if(lb)lb.innerHTML=limitHTML(EDIT);return}
+  if(EDIT&&['cost','ship','pack','other','listPrice'].includes(e.target.dataset.f)){if(e.target.dataset.f==='listPrice')document.querySelectorAll('#shB [data-f="listPrice"]').forEach(x=>{if(x!==e.target)x.value=e.target.value});readEditor();const lb=$('#limBox');if(lb)lb.innerHTML=limitHTML(EDIT);return}
   if(e.target.dataset.calc){const rows=calcRows();rows[+e.target.dataset.i][e.target.dataset.calc]=e.target.value;renderCalc();const el=document.querySelector('[data-calc="'+e.target.dataset.calc+'"][data-i="'+e.target.dataset.i+'"]');if(el){el.focus();const p=el.value.length;try{el.setSelectionRange(p,p)}catch(_){}}return}
   if(e.target.id==='hq'){UI.hq=e.target.value;if(UI.tab==='look')partial(huntPage(),['huntRes','hCnt']);return}
   if(e.target.id==='lq'){UI.listQ=e.target.value;UI.listN=150;if(UI.tab==='list')partial(listHTML(),['listRes']);return}
