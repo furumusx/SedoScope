@@ -183,7 +183,17 @@ table.fixt{table-layout:fixed}
 .hunt-acc summary{font-weight:700;cursor:pointer}
 .hrow{display:flex;gap:var(--sp2);padding:var(--sp2) 0;border-bottom:1px solid var(--line);cursor:pointer}
 .hrow .t{font-weight:600;overflow-wrap:anywhere}.hrow .s{font-size:var(--fs-sub);color:var(--mut)}
-.hrow .hd{font-size:11px;color:var(--mut);text-align:right;flex:none}.hrow .hd.old{color:var(--w)}
+.hrow .hd{font-size:11px;color:var(--mut);text-align:right;flex:none;line-height:1.3}.hrow .hd.old{color:var(--w)}
+.hcard{padding-top:0;padding-bottom:0}.hcard .hrow:last-child{border-bottom:none}
+.hrow .h1{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px var(--sp2)}.hrow .h1 .t{font-size:16px;font-weight:700}.hrow .hv{font-size:var(--fs-sub);color:var(--mut)}.hrow .h1 .st{font-size:10px}
+.hrow .hp{display:flex;flex-wrap:wrap;gap:4px var(--sp3);margin-top:4px}
+.pz{font-family:var(--mono,ui-monospace),monospace;font-variant-numeric:tabular-nums;font-weight:700;font-size:15px;white-space:nowrap}.pz small{font-family:-apple-system,sans-serif;font-weight:400;font-size:11px;color:var(--mut);margin-right:4px}
+.pz.cap{color:var(--ss)}.pz.med{color:var(--tx)}.pz.none small{margin:0}
+.hrow .hm{font-size:12px;color:var(--mut);margin-top:3px;overflow-wrap:anywhere}
+.hrow .ho{display:inline-block;font-size:11px;color:var(--s);border:1px solid var(--line);border-radius:999px;padding:0 8px;margin-top:4px}
+.hcats{margin-bottom:var(--sp2)}
+.hinfo{display:flex;align-items:center;gap:var(--sp2);font-size:12px;color:var(--mut);margin:0 var(--sp1) var(--sp1);flex-wrap:wrap}
+.hx summary{cursor:pointer;color:var(--mut);list-style:none}.hx summary::before{content:"ⓘ "}.hx summary::-webkit-details-marker{display:none}.hx[open]{flex-basis:100%}
 .chip.hunt{border-color:#25506b;background:#10283a;color:#8fd3ff;font-weight:700}
 label.pick{position:relative;overflow:hidden}label.pick input{position:absolute;inset:0;opacity:0;font-size:0}
 .selbar{position:fixed;left:12px;right:12px;bottom:calc(var(--tabh) + var(--safe) + var(--sp2));z-index:35;background:var(--card2);border:1px solid var(--line);border-radius:var(--r-lg);padding:var(--sp2) var(--sp3);display:flex;gap:var(--sp2);align-items:center;box-shadow:0 6px 18px rgba(0,0,0,.45)}
@@ -239,9 +249,10 @@ input[type="date"]{min-width:0;max-width:100%}
    データ: localStorage "sedoscope_s_v1"（SedoScope本体 "sedoscope_v1" とは別）
    外部通信: openBD ISBN照会のみ
    ============================================================ */
-const APP_VER='1.7.0';
+const APP_VER='1.7.1';
 const APP_DATE='2026-10-24';
 const CHANGELOG=[
+  'v1.7.1（2026-10-27）調べる（探し物リスト）の見た目を整理：検索の直下にカテゴリ切り替え（選択は次回も保持）、作品名・上限価格・メモの強弱をはっきり。商品編集に「📷 KOMAで撮影」ボタンを追加。',
   'v1.7.0（2026-10-27）POSTAの出品メモ機能をSSSに内蔵：商品編集に「出品メモ」区画（タイトル・本文の自動生成とコピー、出品価格、定型文、値下げ限界ライン）。設定に「POSTAのバックアップを取り込む」と定型文の管理を追加。「POSTAで出品メモ」ボタンは廃止。',
   'v1.6.0（2026-10-27）収支・経費帳簿を追加（集計タブの「収支」：月ごとの売上・売上コスト・経費・純利益、12ヶ月の推移、経費の記録、収支CSV）。ステータス「取引中」を追加。商品と探し物リストにカテゴリ（本・コミック／トレカ／CD・音楽／古着／ゲーム／その他）を追加し、本専用の機能は本・コミックだけに効くようにした。',
   'v1.5.0（2026-10-27）相場CSVの「貼り付け」取り込みが読まれていなかった不具合を修正。タブを4つ（調べる／一覧／集計／設定）にし、カゴを廃止。「調べる」は探し物チェックリスト専用（出版社別・所持巻・確認日・絞り込み検索）にした。保存済みのカゴのデータは消さずに残している。',
@@ -287,7 +298,7 @@ function defSettings(){return{
       r:{name:'ラクマ',fee:10,ship:210,on:true},a:{name:'ヤフオク',fee:10,ship:210,on:true}},
   pack:30,other:0,main:'m',pick:'main',
   acc:{obi:10,cover:30,booklet:10,poster:5,other:0},
-  store:'',stores:[],budget:'',autoQueue:false,postaUrl:'https://furumusx.github.io/posta/',
+  store:'',stores:[],budget:'',autoQueue:false,postaUrl:'https://furumusx.github.io/posta/',komaUrl:'https://furumusx.github.io/KOMA/',huntCat:'',
 }}
 function defState(){return{schema:1,items:[],hunt:[],expenses:[],templates:defTemplates(),queue:[],biblio:{},settings:defSettings(),links:DEF_LINKS.map(x=>({...x})),
   meta:{created:new Date().toISOString(),lastBackup:null,imports:[]}}}
@@ -630,21 +641,30 @@ function renderPad(){
 function updatePV(){const e=$('#pv');if(e)e.textContent=CUR&&CUR.price!==''&&CUR.price!=null?Number(CUR.price).toLocaleString('ja-JP'):'—'}
 function huntPage(){const L=S.hunt||[];
   if(!L.length)return `<div class="empty">📋 探し物リストはまだありません。<br>設定タブの「探し物リストを取り込む」から、探し物リスト（JSON）を読み込んでください。<br><button class="btn pri mt3" data-tab="set">設定タブを開く</button></div>`;
+  const allCats=[...new Set(L.map(catOf))].sort((a,b)=>{const ia=CATS.indexOf(a),ib=CATS.indexOf(b);return (ia<0?99:ia)-(ib<0?99:ib)||a.localeCompare(b)});
+  let hc=S.settings.huntCat||'';if(hc&&!allCats.includes(hc))hc='';
   const q=String(UI.hq||'').normalize('NFKC').toLowerCase();
-  const hit=L.map((e,i)=>[e,i]).filter(([e])=>!q||[e.title,e.work,e.publisher,catOf(e)].join(' ').normalize('NFKC').toLowerCase().includes(q));
+  const hit=L.map((e,i)=>[e,i]).filter(([e])=>(!hc||catOf(e)===hc)&&(!q||[e.title,e.work,e.publisher,catOf(e),e.memo].join(' ').normalize('NFKC').toLowerCase().includes(q)));
+  const inCat=hc?L.filter(e=>catOf(e)===hc).length:L.length;
   const fresh=num(S.settings.fresh)||30;
+  const volTxt=e=>{const v=String(e.vols??'').trim();if(!v)return '';return /巻/.test(v)?v:v+'巻'};
+  const row=([e,i])=>{const bk=isBook(e);const o=bk?[...ownedVols(e)].sort((x,y)=>x-y):[];const d=e.checked?daysAgo(e.checked):null;const old=d!==null&&d>fresh;
+    const isSet=!!e.setCap||/セット|全巻/.test(e.title);
+    const prices=[e.perVolCap?['単巻上限',e.perVolCap,'cap']:null,e.setCap?['セット上限',e.setCap,'cap']:null,e.median?[isSet?'セット中央値':'中央値',e.median,'med']:null].filter(Boolean);
+    return `<div class="hrow" data-act="huntOpen" data-i="${i}"><div class="grow">
+      <div class="h1"><span class="t">${esc(e.title)}</span>${volTxt(e)&&!/\d\s*巻/.test(String(e.title).normalize('NFKC'))?`<span class="hv">${esc(volTxt(e))}</span>`:''}${e.provisional?'<span class="st listed">要再調査</span>':''}</div>
+      <div class="hp">${prices.length?prices.map(([l,v,c])=>`<span class="pz ${c}"><small>${l}</small>${yenT(v)}</span>`).join(''):'<span class="pz none"><small>上限なし</small></span>'}</div>
+      ${e.memo?`<div class="hm">${esc(e.memo)}</div>`:''}
+      ${bk&&o.length?`<div class="ho">📦 所持 ${esc(compactVols(o))}</div>`:''}</div>
+      <div class="hd ${old?'old':''}">${e.checked?`${esc(e.checked.slice(5).replace('-','/'))}${old?'<br>古い':''}`:'確認日<br>なし'}</div></div>`};
+  const pubGroups=arr=>{const groups={};arr.forEach(([e,i])=>{const k=e.publisher||'（出版社なし）';(groups[k]=groups[k]||[]).push([e,i])});
+    return Object.keys(groups).sort().map(g=>`<div class="hsub">${esc(g)}（${groups[g].length}）</div><div class="card hcard">${groups[g].map(row).join('')}</div>`).join('')};
   const byCat={};hit.forEach(x=>{const c=catOf(x[0]);(byCat[c]=byCat[c]||[]).push(x)});
-  const cats=Object.keys(byCat).sort((a,b)=>{const ia=CATS.indexOf(a),ib=CATS.indexOf(b);return (ia<0?99:ia)-(ib<0?99:ib)||a.localeCompare(b)});
-  const multi=L.some(e=>!isBook(e));
-  const row=([e,i])=>{const bk=isBook(e);const o=bk?[...ownedVols(e)].sort((x,y)=>x-y):[];const d=e.checked?daysAgo(e.checked):null;
-    return `<div class="hrow" data-act="huntOpen" data-i="${i}"><div class="grow"><div class="t">${esc(e.title)}${e.provisional?' <span class="st listed">要再調査</span>':''}</div>
-    <div class="s">中央値 ${e.median?yenT(e.median):'—'}・${e.perVolCap?`単巻上限 ${yenT(e.perVolCap)}`:''}${e.perVolCap&&e.setCap?'・':''}${e.setCap?`セット上限 ${yenT(e.setCap)}`:''}${!e.perVolCap&&!e.setCap?'上限なし':''}${bk?`・所持：${o.length?esc(compactVols(o)):'なし'}`:''}</div>
-    ${e.memo?`<div class="s">${esc(e.memo)}</div>`:''}</div><div class="hd ${d!==null&&d>fresh?'old':''}">${e.checked?`確認 ${esc(e.checked.slice(5))}${d!==null&&d>fresh?'<br>古い':''}`:'確認日なし'}</div></div>`};
-  const pubGroups=(arr,sub)=>{const groups={};arr.forEach(([e,i])=>{const k=e.publisher||'（出版社なし）';(groups[k]=groups[k]||[]).push([e,i])});
-    return Object.keys(groups).sort().map(g=>`<div class="${sub?'hsub':'sec'}">${esc(g)}（${groups[g].length}）</div><div class="card">${groups[g].map(row).join('')}</div>`).join('')};
-  const body=!multi?pubGroups(hit,false):cats.map(c=>`<div class="sec">${esc(c)}（${byCat[c].length}）</div>${c===BOOK?pubGroups(byCat[c],true):`<div class="card">${byCat[c].map(row).join('')}</div>`}`).join('');
-  return `<div class="srch"><input id="hq" type="search" placeholder="作品名・出版社・カテゴリで絞り込み" value="${esc(UI.hq||'')}"></div>
-  <div class="note mb2">📋 探し物リスト ${hit.length}${q?` / ${L.length}`:''}件　所持巻は本・コミックの在庫（仕入済・出品中）から自動で計算しています。</div>
+  const showCatHead=!hc&&allCats.length>1;
+  const body=allCats.filter(c=>byCat[c]).map(c=>`${showCatHead?`<div class="sec">${esc(c)}（${byCat[c].length}）</div>`:''}${c===BOOK?pubGroups(byCat[c]):`<div class="card hcard">${byCat[c].map(row).join('')}</div>`}`).join('');
+  return `<div class="srch"><input id="hq" type="search" placeholder="作品名・出版社・メモで絞り込み" value="${esc(UI.hq||'')}"></div>
+  ${allCats.length>1?`<div class="fchips hcats">${[['','すべて',L.length],...allCats.map(c=>[c,c,L.filter(e=>catOf(e)===c).length])].map(([k,l,n])=>`<button class="${hc===k?'on':''}" data-act="huntCat" data-v="${esc(k)}">${esc(l)} ${n}</button>`).join('')}</div>`:''}
+  <div class="hinfo">📋 ${hit.length}${q?` / ${inCat}`:''}件<details class="hx"><summary>所持巻について</summary><div class="note">所持巻は、本・コミックの在庫（仕入済・出品中）から自動で計算しています。取引中・売却済は数えません。</div></details></div>
   ${body||'<div class="empty">該当する作品はありません。</div>'}`}
 function huntHTML(){const L=S.hunt||[];if(!L.length)return `<details class="card hunt-acc"><summary>📋 探し物リスト（未登録）</summary><div class="note mt2">設定タブの「探し物リストを取り込む」で読み込むと、ここに出版社ごとに表示されます。</div></details>`;
   const groups={};L.forEach((e,i)=>{const k=e.publisher||'（出版社なし）';(groups[k]=groups[k]||[]).push([e,i])});
@@ -1373,6 +1393,7 @@ function memoHTML(e){const book=isBook(e);const tpls=S.templates||[];
   <div class="fld"><label>出品タイトル</label><input data-f="listTitle" value="${esc(e.listTitle||'')}"><div class="note" id="ltC"></div></div>
   <div class="fld"><label>出品本文</label><textarea data-f="listDesc" style="min-height:220px">${esc(e.listDesc||'')}</textarea></div>
   <div class="btns"><button class="btn sm" data-act="memoCopy" data-w="t">タイトルをコピー</button><button class="btn sm" data-act="memoCopy" data-w="b">本文をコピー</button><button class="btn sm" data-act="memoCopy" data-w="both">両方コピー</button></div>
+  <div class="btns mt3"><button class="btn" data-act="komaItem">📷 KOMAで撮影</button></div><div class="note mt1">この商品の情報（商品名・巻・初版/帯/特典/状態）を付けてKOMAを開きます。写真はKOMA側に残ります。</div>
   <div class="fld mt3"><label>出品価格</label><input data-f="listPrice" inputmode="numeric" value="${esc(e.listPrice??'')}"></div>
   <div class="gsec">定型文</div>${tpls.length?`<div class="fld"><select id="tplSel">${tpls.map(t=>`<option value="${esc(t.id)}">${esc(t.name||'（名前なし）')}</option>`).join('')}</select></div>
   <div class="btns"><button class="btn sm" data-act="tplIns">本文に挿入</button><button class="btn sm" data-act="tplCopy">コピー</button></div>`:'<div class="note">定型文がありません。</div>'}
@@ -1410,6 +1431,19 @@ function postaImportApply(d){let merged=0,added=0,tpl=0;const nz=v=>v!==undefine
   for(const t of d.T){const name=String(t.title||t.name||''),body=String(t.body||'');const k=name+'\u0000'+body;if(seen.has(k))continue;seen.add(k);S.templates.push({id:uid(),name,body,cat:String(t.category||'')});tpl++}
   save();return{merged,added,tpl}}
 
+// ---- KOMA へ（v1.7.1）：KOMA の URL 取り込み（src=sss）で受ける。sssId で KOMA 側の二重登録を防ぐ ----
+function komaParams(e){const g=isBook(e)?ensureGen(e):(e.gen||{});const acc=e.acc||{};
+  const tri=v=>v==='all'||v==='part'?v:'none';
+  let shoban=tri(g.shohan),obi=tri(g.obi);if(!g.obi&&acc.obi==='yes')obi='all';
+  const sk=g.kind?({set:'全巻セット',partial:'途中セット',single:'単品',bara:'バラ'})[g.kind]:String(e.setk||'');
+  const bonus=!!(g.tokuten||g._tok||acc.booklet==='yes'||acc.poster==='yes');
+  const bad=/傷や汚れあり|状態が悪い/.test(String(e.cond||''))||(g.points||[]).some(p=>p!=='特になし（きれい）');
+  const work=stripVols(g.work||'')||String(e.work||'')||workFromTitle(e.name||'');
+  return [['src','sss'],['sssId',e.id],['title',e.listTitle||e.name||''],['work',work],['setk',sk],['shoban',shoban],['obi',obi],['bonus',bonus?'1':''],['cond',bad?'bad':'']]
+    .filter(([k,v])=>v!==undefined&&v!==null&&String(v)!=='').map(([k,v])=>k+'='+encodeURIComponent(String(v))).join('&')}
+function komaItem(){const base=String(S.settings.komaUrl||'').trim();if(!base){toast('設定でKOMAのURLを入力してください');return}
+  const e=saveEditor();if(!e)return;location.href=base+(base.includes('?')?'&':'?')+komaParams(e)}
+
 /* ---------- 設定 ---------- */
 function setHTML(){
   const s=S.settings;const size=new Blob([JSON.stringify(S)]).size;const qn=S.items.reduce((a,i)=>a+(i.quotes||[]).length,0);
@@ -1438,6 +1472,7 @@ function setHTML(){
   <div class="note mt2">リンクは外部サイトを開くだけで、データの自動取得はしません。</div></div>
   <div class="sec">定型文（出品メモで使います）</div><div class="card">${(S.templates||[]).map(t=>`<div class="qrow" data-act="tplOpen" data-id="${esc(t.id)}" style="cursor:pointer"><span class="grow"><b>${esc(t.name||'（名前なし）')}</b><br><span class="mut">${esc(String(t.body||'').slice(0,40))}${String(t.body||'').length>40?'…':''}</span></span><span>›</span></div>`).join('')||'<div class="note">定型文はありません</div>'}
   <div class="btns mt2"><button class="btn" data-act="tplOpen">＋定型文を追加</button></div><div class="note mt1">{商品名} {価格} {状態} {今日} が使えます（出品メモで挿入・コピーするときに置き換わります）。</div></div>
+  <div class="sec">KOMA連携</div><div class="card"><div class="fld"><label>KOMAのURL（商品編集の「📷 KOMAで撮影」で開きます）</label>${inp('komaUrl',s.komaUrl)}</div></div>
   <div class="sec">POSTAから移行</div><div class="card"><div class="note mb2">旧POSTAの「データ」→書き出し で保存したバックアップ（posta_backup_*.json）を読み込み、出品メモと定型文をSSSに移します。売却記録・計算履歴は取り込みません。在庫・相場・帳簿のデータは変わりません。</div>
   <label class="btn">📥 POSTAのバックアップを取り込む<input type="file" id="postaF" accept=".json,application/json,text/plain" hidden></label></div>
   <div class="sec">データ</div><div class="card sum">
@@ -1738,6 +1773,8 @@ const ACT={
     EDIT.quotes=EDIT.quotes||[];EDIT.quotes.push(normQuote({price:p,status:$('#nqS').value,src:$('#nqC').value,cond:$('#nqD').value,date:$('#nqT').value||today(),title:EDIT.name,imp:'manual'}));drawEditorKeep();toast('追加しました（保存を押すと確定）')},
   csvForEdit(){const e=saveEditor();if(!e)return;csvOpen(e.id,e.name)},
   saveItem(){if(saveEditor()){closeSheet();render()}},
+  huntCat(b){S.settings.huntCat=b.dataset.v;save();render()},
+  komaItem(){komaItem()},
   genApply(){readEditor();const g=EDIT.gen;if(!String(g.work||'').trim()){toast('作品名を入力してください');return}const t=genTitle(g),d=genBody(g);
     if(!(EDIT.listTitle&&EDIT.listTitle!==t&&!confirm('出品タイトルに入力済みの内容を、生成したタイトルで上書きしますか？')))EDIT.listTitle=t;
     if(!(EDIT.listDesc&&EDIT.listDesc!==d&&!confirm('出品本文に入力済みの内容を、生成した本文で上書きしますか？')))EDIT.listDesc=d;
