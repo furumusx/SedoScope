@@ -164,6 +164,17 @@ tr.best{color:var(--ss)}
 table.fixt{table-layout:fixed}
 .calcrow{display:flex;gap:var(--sp2);align-items:center;margin-bottom:var(--sp2)}
 .calcrow .inline-in{width:96px}
+.gen{border:2px solid var(--acc);border-radius:var(--r-lg);padding:var(--sp3);margin-bottom:var(--sp3)}
+.gen h4{margin:0 0 var(--sp2);font-size:var(--fs-sec)}
+.gsec{font-size:var(--fs-sub);color:var(--mut);font-weight:700;margin:var(--sp3) 0 var(--sp1)}
+.opts{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:var(--sp2)}
+.opts label{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:999px;padding:4px 10px;font-size:13px;background:var(--card2)}
+.opts input{accent-color:var(--acc);width:auto;height:auto}
+.pvb{white-space:pre-wrap;background:var(--card2);border:1px solid var(--line);border-radius:var(--r-md);padding:var(--sp2);font-size:13px;line-height:1.6;overflow-wrap:anywhere}
+.pvt{font-weight:700;overflow-wrap:anywhere}
+.tchips{display:flex;flex-wrap:wrap;gap:6px;margin:var(--sp1) 0 var(--sp2)}.tchips button{font-size:12px;border-radius:999px;padding:4px 10px;border:1px solid var(--line);background:var(--card2);color:var(--mut)}.tchips button.on{background:var(--acc);border-color:var(--acc);color:#04203f}
+.wn{color:var(--w);font-weight:700}
+.lim td,.lim th{font-size:12px}.lim tr.under td{color:var(--x)}
 .selfrow{display:flex;gap:var(--sp2);margin-bottom:var(--sp2);flex-wrap:wrap;align-items:center}
 .self{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
 .self span{font-size:var(--fs-sub);color:var(--mut)}
@@ -228,9 +239,10 @@ input[type="date"]{min-width:0;max-width:100%}
    データ: localStorage "sedoscope_s_v1"（SedoScope本体 "sedoscope_v1" とは別）
    外部通信: openBD ISBN照会のみ
    ============================================================ */
-const APP_VER='1.6.0';
+const APP_VER='1.7.0';
 const APP_DATE='2026-10-24';
 const CHANGELOG=[
+  'v1.7.0（2026-10-27）POSTAの出品メモ機能をSSSに内蔵：商品編集に「出品メモ」区画（タイトル・本文の自動生成とコピー、出品価格、定型文、値下げ限界ライン）。設定に「POSTAのバックアップを取り込む」と定型文の管理を追加。「POSTAで出品メモ」ボタンは廃止。',
   'v1.6.0（2026-10-27）収支・経費帳簿を追加（集計タブの「収支」：月ごとの売上・売上コスト・経費・純利益、12ヶ月の推移、経費の記録、収支CSV）。ステータス「取引中」を追加。商品と探し物リストにカテゴリ（本・コミック／トレカ／CD・音楽／古着／ゲーム／その他）を追加し、本専用の機能は本・コミックだけに効くようにした。',
   'v1.5.0（2026-10-27）相場CSVの「貼り付け」取り込みが読まれていなかった不具合を修正。タブを4つ（調べる／一覧／集計／設定）にし、カゴを廃止。「調べる」は探し物チェックリスト専用（出版社別・所持巻・確認日・絞り込み検索）にした。保存済みのカゴのデータは消さずに残している。',
   'v1.4.9（2026-10-27）探し物リスト連携：判定の照合先を探し物リスト優先にし（買い上限はリストの値、所持巻は在庫から自動表示）、調べるタブに探し物リスト区画を追加。一覧に「読み取りで追加」（仕入価格を入れてバーコードを連続読み取り→仕入済みに登録、同じ巻の在庫があれば注意）を追加。',
@@ -277,7 +289,7 @@ function defSettings(){return{
   acc:{obi:10,cover:30,booklet:10,poster:5,other:0},
   store:'',stores:[],budget:'',autoQueue:false,postaUrl:'https://furumusx.github.io/posta/',
 }}
-function defState(){return{schema:1,items:[],hunt:[],expenses:[],queue:[],biblio:{},settings:defSettings(),links:DEF_LINKS.map(x=>({...x})),
+function defState(){return{schema:1,items:[],hunt:[],expenses:[],templates:defTemplates(),queue:[],biblio:{},settings:defSettings(),links:DEF_LINKS.map(x=>({...x})),
   meta:{created:new Date().toISOString(),lastBackup:null,imports:[]}}}
 
 /* ---------- 保存 ---------- */
@@ -291,6 +303,7 @@ function fixState(s){
   s.settings=Object.assign(ds,ss,{ch,acc:Object.assign({},ds.acc,ss.acc||{})});
   s.links=Array.isArray(s.links)?s.links:d.links;
   s.hunt=Array.isArray(s.hunt)?s.hunt:[];
+  s.templates=Array.isArray(s.templates)?s.templates.filter(x=>x&&typeof x==='object'):defTemplates();
   s.expenses=Array.isArray(s.expenses)?s.expenses.filter(x=>x&&typeof x==='object'):[];
   for(const it of s.items)if(!it.cat)it.cat=BOOK;   // v1.6.0：既存アイテムは本・コミック
   s.meta=Object.assign(d.meta,s.meta||{});
@@ -315,6 +328,9 @@ function fnum(it,k,def){if(it&&it[k]!==''&&it[k]!=null&&isFinite(num(it[k])))ret
 const yen=(n,cls='')=>isFinite(n)?`<span class="num ${cls}">${Math.round(n).toLocaleString('ja-JP')}</span><small class="u">円</small>`:'<span class="num mut">—</span>';
 const yenT=n=>isFinite(n)?Math.round(n).toLocaleString('ja-JP')+'円':'—';
 const pct=n=>isFinite(n)?(n*100).toFixed(1)+'%':'—';
+async function copyText(t){try{await navigator.clipboard.writeText(t);toast('コピーしました');return true}catch(e){
+  const a=document.createElement('textarea');a.value=t;a.setAttribute('readonly','');a.style.position='fixed';a.style.opacity='0';document.body.appendChild(a);a.select();a.setSelectionRange(0,t.length);
+  let ok=false;try{ok=document.execCommand('copy')}catch(_){}a.remove();toast(ok?'コピーしました':'コピーできませんでした');return ok}}
 function median(a){if(!a.length)return NaN;const b=[...a].sort((x,y)=>x-y),m=b.length>>1;return b.length%2?b[m]:(b[m-1]+b[m])/2}
 function today(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
 function ymd(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
@@ -1040,7 +1056,7 @@ const FIELDS=[
   ['想定売価（手入力すると相場より優先）'],
   ['pm','メルカリ','num'],['py','Yahoo!フリマ','num'],['pr','ラクマ','num'],['pa','ヤフオク','num'],['lo','想定 下限','num'],['hi','想定 上限','num'],
   ['出品・売却'],
-  ['listPrice','出品価格','num'],['listDate','出品日','date'],['soldPrice','売却価格','num'],['soldDate','売却日','date'],['soldCh','売却販路','ch'],['soldFee','実際の手数料','num'],
+  ['listDate','出品日','date'],['soldPrice','売却価格','num'],['soldDate','売却日','date'],['soldCh','売却販路','ch'],['soldFee','実際の手数料','num'],
   ['メモ'],
   ['tags','タグ','text'],['memo','メモ','area']
 ];
@@ -1094,6 +1110,7 @@ function drawEditor(){
   // 束ねた単巻
   const mem=S.items.filter(i2=>i2.inSet===e.id);
   if(mem.length)h+=`<div class="edsec"><div class="edh">束ねた単巻（${mem.length}冊）</div>${mem.map(m=>`<div class="qrow" data-act="openMember" data-id="${esc(m.id)}" style="cursor:pointer"><span>${esc(m.name)}</span><span class="num">${yenT(num(m.cost))} ›</span></div>`).join('')}<div class="btns mt2"><button class="btn sm" data-act="unbundleItem">束ねを解除する</button></div></div>`;
+  h+=memoHTML(e);
   // 相場
   const qs=(e.quotes||[]).slice().reverse();
   h+=`<div class="edsec"><div class="edh">この商品の相場（${qs.length}件・作品単位で共有されます）</div>
@@ -1103,14 +1120,14 @@ function drawEditor(){
   <div class="grid2"><div class="fld"><label>状態</label><input id="nqD" placeholder="目立った傷なし 等"></div><div class="fld"><label>確認日</label><input id="nqT" type="date" value="${today()}"></div></div>
   <div class="btns"><button class="btn" data-act="addQuote">相場を追加</button><button class="btn" data-act="csvForEdit">相場CSVを取り込む</button></div>
   <div class="mt2">${qs.slice(0,80).map(q=>`<div class="qrow"><span>${q.status==='sold'?'売切':q.status==='listing'?'出品中':'不明'}・${esc(q.ch&&q.ch!=='o'?S.settings.ch[q.ch].name:q.src||'')}・${esc(q.cond||'')}<br><span class="mut">${esc(q.title||'')}</span></span><span class="num">${yenT(q.price)}<br><span class="mut">${esc(q.date||'')}</span></span></div>`).join('')}${qs.length>80?`<div class="note">ほか${qs.length-80}件</div>`:''}</div></div>`;
-  const extra=Object.keys(e).filter(k=>!FIELDS.some(f=>f[0]===k)&&!['id','quotes','acc','created','_isNew','cover','autoBundle','inSet'].includes(k));
+  const extra=Object.keys(e).filter(k=>!FIELDS.some(f=>f[0]===k)&&!['id','quotes','acc','created','_isNew','cover','autoBundle','inSet','listTitle','listDesc','listPrice','gen','postaId'].includes(k)&&!k.startsWith('_'));
   if(extra.length)h+=`<div class="note mt3">その他の保存項目（表示のみ・そのまま保持）：${esc(extra.join(', '))}</div>`;
-  h+=`<div class="btns edfoot"><button class="btn pri" data-act="saveItem">保存</button><button class="btn" data-act="postaItem">POSTAで出品メモ</button>${e._isNew?'':`<button class="btn dng" data-act="delItem">削除</button>`}</div>`;
-  openSheet(e._isNew?'新規商品':(e.name||'商品'),h);
+  h+=`<div class="btns edfoot"><button class="btn pri" data-act="saveItem">保存</button>${e._isNew?'':`<button class="btn dng" data-act="delItem">削除</button>`}</div>`;
+  openSheet(e._isNew?'新規商品':(e.name||'商品'),h);updGen();updLtCount();
 }
 function readEditor(){
   document.querySelectorAll('#shB [data-f]').forEach(el=>{const k=el.dataset.f;const def=FIELDS.find(f=>f[0]===k);let v=el.value;
-    if(def&&def[2]==='num'){v=v.trim()===''?'':(isFinite(num(v))?num(v):v)}if(Array.isArray(EDIT[k]))v=v.split(/[,、]/).map(x=>x.trim()).filter(Boolean);EDIT[k]=v});
+    if((def&&def[2]==='num')||k==='listPrice'){v=v.trim()===''?'':(isFinite(num(v))?num(v):v)}if(Array.isArray(EDIT[k]))v=v.split(/[,、]/).map(x=>x.trim()).filter(Boolean);EDIT[k]=v});
 }
 function saveEditor(){
   readEditor();const e=EDIT;if(!String(e.name||'').trim()&&!String(e.code||'').trim()){toast('商品名かISBNを入力してください');return null}
@@ -1220,6 +1237,179 @@ function pnlCsv(){const y=(UI.pnlM||curYM()).slice(0,4);const rows=[];
   document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1500);
   toast(`${y}年の収支CSVを書き出しました（${rows.length}行）`)}
 
+/* ---------- 出品メモ（v1.7.0：POSTAから移植） ---------- */
+const POINTS=['ヤケあり','スレあり','小口の汚れ','折れあり','書き込みあり','特になし（きれい）'];
+const KIND={set:'全巻セット',partial:'途中セット',single:'単巻',bara:'バラ（複数冊まとめ）'};
+function defTemplates(){const P=[
+  ['購入の挨拶','購入させていただきました。お取引が完了するまで、よろしくお願いいたします。'],
+  ['購入お礼＋発送予定','この度は {商品名} をご購入いただき、ありがとうございます。{今日}〜2日以内に発送いたします。発送後に改めてご連絡しますので、よろしくお願いいたします。'],
+  ['発送完了の連絡','発送が完了しましたのでご連絡いたします。お手元に届くまで今しばらくお待ちください。よろしくお願いいたします。'],
+  ['値下げ交渉へのお返事（受ける）','コメントありがとうございます。ご提示の金額でお譲りできますので、価格を変更いたしました。ご検討よろしくお願いいたします。'],
+  ['値下げ交渉へのお返事（断る）','コメントありがとうございます。申し訳ありませんが、{商品名} は現在の価格が限界のため、値下げはお受けできません。ご理解いただけますと幸いです。'],
+  ['バラ売りについて','コメントありがとうございます。申し訳ありませんが、こちらはセットでの販売のみとなっております。バラ売りは行っておりませんので、ご了承ください。'],
+  ['帯・初版の質問への回答','コメントありがとうございます。帯・初版の有無については、商品写真と説明文に記載の通りとなります。追加の写真が必要でしたらお知らせください。'],
+  ['受取評価のお願い','無事に届きましたでしょうか。問題がなければ、受取評価をよろしくお願いいたします。こちらも届き次第、評価させていただきます。'],
+  ['取引完了のお礼','受取評価ありがとうございました。こちらも評価させていただきました。またご縁がありましたら、よろしくお願いいたします。'],
+  ['受け取りました','商品を受け取りました。迅速で丁寧なご対応をありがとうございました。またご縁がありましたら、よろしくお願いいたします。']];
+  return P.map(([n,b],i)=>({id:'t'+i+Math.random().toString(36).slice(2,6),name:n,body:b}))}
+function todayJ(){const d=new Date();return `${d.getMonth()+1}月${d.getDate()}日`}
+function fillTpl(body,e){return String(body||'').replace(/\{今日\}/g,todayJ()).replace(/\{商品名\}/g,(e&&(e.listTitle||e.name))||'')
+  .replace(/\{価格\}/g,e&&num(e.listPrice)>0?'¥'+num(e.listPrice).toLocaleString('ja-JP'):'').replace(/\{状態\}/g,(e&&e.cond)||'')}
+// ---- 生成ロジック（POSTA の確定仕様をそのまま移植） ----
+function volsList(s){return String(s||'').normalize('NFKC').split(/[,、\s]+/).map(x=>x.replace(/巻/g,'').trim()).filter(Boolean)}
+function volsText(s){const a=volsList(s);return a.length?a.join('巻・'):''}
+function workFromTitle(t){let s=String(t||'').trim();const orig=s;
+  s=s.replace(/【[^】]*】/g,' ').trim();
+  s=s.replace(/\s+\d{1,3}\s*[-–—]\s*\d{1,3}\s*(巻|全巻セット|途中セット|完結セット|セット)?\s*$/,'');
+  s=s.replace(/\s+\d{1,3}\s*[〜~\-ー]\s*\d{1,3}\s*巻\s*(全巻セット|途中セット|完結セット|セット|単巻)?\s*$/,'');
+  s=s.replace(/\s+第?\d{1,3}\s*巻\s*(全巻セット|途中セット|セット)?\s*$/,'');
+  s=s.replace(/\s+(全巻セット|途中セット|完結セット|セット)\s*$/,'');
+  s=s.replace(/\s+/g,' ').trim();return s||orig}
+const isSetKind=g=>g.kind==='set'||g.kind==='partial'||g.kind==='bara';
+function volsCsv(s){return [...parseVols(s)].sort((a,b)=>a-b).join(',')}
+function volsLabel(csv){const a=[...parseVols(csv)].sort((x,y)=>x-y);if(!a.length)return '';const out=[];let i=0;
+  while(i<a.length){let j=i;while(j+1<a.length&&a[j+1]===a[j]+1)j++;if(j-i+1>=4)out.push(`${a[i]}〜${a[j]}`);else for(let k=i;k<=j;k++)out.push(String(a[k]));i=j+1}
+  return out.join(',')+'巻'}
+const stripVols=w=>String(w||'').replace(/\s+[\d,，〜~\-]+巻\s*$/,'').trim();
+function workWithVols(g){const b=stripVols(g.work);return (isSetKind(g)&&g.vols&&b)?`${b} ${volsLabel(g.vols)}`:(isSetKind(g)?b:String(g.work||'').trim())}
+function syncWork(g){if(!g.work)return;g.work=workWithVols(g)}
+function rangeLabel(g){const f=String(g.from||'').trim(),t=String(g.to||'').trim();
+  if(g.kind==='single')return f?`${f}巻`:'';if(!f&&!t)return '';if(f&&t&&f!==t)return `${f}〜${t}巻`;return `${f||t}巻`}
+function kindWord(g){return g.kind==='set'?'全巻セット':g.kind==='partial'?'途中セット':g.kind==='bara'?'バラセット':''}
+function genTitle(g){
+  let sum='';if(g.shohan==='all'&&g.obi==='all')sum='【初版・帯付き】';else if(g.shohan==='all'&&g.obi!=='unknown')sum='【初版】';else if(g.obi==='all'&&(g.shohan==='none'||!g.shohan))sum='【帯付き】';
+  const sv=isSetKind(g)&&g.vols;
+  const parts=[sv?workWithVols(g):g.work,sv?'':rangeLabel(g),kindWord(g),g.tokuten?'特典付き':'',g.author].map(x=>String(x||'').trim()).filter(Boolean);
+  return sum+parts.join(' ')}
+function line1(g){const s=g.shohan,o=g.obi,sv=volsText(g.shohanVols),ov=volsText(g.obiVols);
+  if(s==='unknown'||o==='unknown')return '初版・帯の有無は未確認です。写真でご確認ください。';
+  if(s==='all'&&o==='all')return '初版・帯付きです。';
+  if(s==='all'&&o==='none')return '初版です。帯はありません。';
+  if(s==='all'&&o==='part')return `初版です。帯は${ov}巻のみ付いています。`;
+  if(s==='all')return '初版です。';
+  if(s==='none'&&o==='all')return '帯付きです。初版ではありません。';
+  if(s==='part'){let t=`初版は${sv}巻のみです。`;if(o==='all')t+='帯は全巻に付いています。';else if(o==='part')t+=`帯は${ov}巻のみ付いています。`;else if(o==='none')t+='帯はありません。';return t}
+  if(s==='none'&&o==='part')return `初版ではありません。帯は${ov}巻のみ付いています。`;
+  if(s==='none'&&o==='none')return '';
+  if(o==='all')return '帯付きです。';
+  if(o==='part')return `帯は${ov}巻のみ付いています。`;
+  if(s==='none')return '初版ではありません。';
+  if(o==='none')return '帯はありません。';
+  return ''}
+function line2(g){const p=(g.points||[]);if(!p.length)return '';if(p.includes('特になし（きれい）'))return '汚れ・破れ・折れ・曲がりなどはなく、通読に支障はありません。';return `${p.join('・')}がありますが、通読に支障はありません。`}
+function tagList(s){return String(s||'').split(/[\s,、，]+/).map(x=>x.replace(/^#+/,'').trim()).filter(Boolean)}
+function genBody(g){
+  const L=['ご覧いただきありがとうございます。',''];
+  if(String(g.outline||'').trim())L.push(String(g.outline).trim(),'');
+  const sv=isSetKind(g)&&g.vols;
+  L.push(`* タイトル：${[sv?workWithVols(g):g.work,sv?'':rangeLabel(g),kindWord(g)].map(x=>String(x||'').trim()).filter(Boolean).join(' ')}`);
+  if(String(g.author||'').trim())L.push(`* 著者：${g.author.trim()}`);
+  if(String(g.publisher||'').trim())L.push(`* 出版社：${g.publisher.trim()}`);
+  L.push('','【商品状態】');
+  const st=[line1(g),line2(g),g.tokuten?`特典：${g.tokuten} が付属します。`:''].filter(Boolean);
+  const mk='①②③④⑤';st.forEach((x,i)=>L.push(`${mk[i]} ${x}`));
+  L.push('','※商品の状態は写真をご確認ください。','','その他、ご不明な点やご質問等がありましたら、お気軽にコメントください。','','よろしくお願いいたします。','');
+  const tags=[];const w=stripVols(g.work).replace(/\s+/g,'');if(w)tags.push(w);tags.push('本','コミック');
+  for(const t of tagList(g.tags))if(!tags.includes(t))tags.push(t);
+  L.push(...tags.map(t=>'#'+t));
+  return L.join('\n')}
+function tagCands(g){const c=[];const a=String(g.author||'').replace(/\s+/g,'');if(a)c.push(a);if(String(g.publisher||'').trim())c.push(g.publisher.trim().replace(/\s+/g,''));
+  if(g.kind==='set')c.push('全巻セット');if(g.shohan==='all')c.push('初版');if(g.obi==='all')c.push('帯付き');c.push('漫画');
+  for(const t of (g.tagCands||[]))if(t)c.push(String(t).replace(/^#/,''));return [...new Set(c)]}
+// ---- SSS の商品から生成パネルの初期値を作る ----
+function memberVolsCsv(e){const mem=S.items.filter(m=>m.inSet===e.id);if(!mem.length)return '';const set=new Set();for(const m of mem)for(const v of itemVols(m))set.add(v);return [...set].sort((a,b)=>a-b).join(',')}
+function genDefault(e){const g={work:'',author:String(e.author||''),publisher:String(e.pub||''),outline:'',tags:'',isbn:String(e.code||''),kind:'',from:'',to:'',vols:'',shohan:'',shohanVols:'',obi:'',obiVols:'',tokuten:'',points:[],tagCands:[]};
+  const sk=String(e.setk||'').trim();const mv=memberVolsCsv(e);
+  if(sk==='単巻')g.kind='single';else if(sk==='全巻セット')g.kind='set';else if(sk==='途中セット'||sk==='セット')g.kind='partial';else if(mv)g.kind='partial';else if(!sk&&volOf(e.name)!=null&&!/セット/.test(String(e.name||'')))g.kind='single';
+  const rg=itemRangeOf(e);if(rg){g.from=String(rg[0]);g.to=String(rg[1])}if(g.kind==='single'){const v=volOf(e.name);if(v!=null){g.from=String(v);g.to=''}}
+  g.work=stripVols(workFromTitle(e.work||e.name||''));
+  if(isSetKind(g)){const v=mv||(e.have?volsCsv(e.have):(e.range?volsCsv(e.range):(rg?volsCsv(`${rg[0]}-${rg[1]}`):'')));if(v){g.vols=v;g.work=workWithVols(g)}}
+  const acc=e.acc||{};if(acc.obi==='yes')g.obi='all';else if(acc.obi==='no')g.obi='none';
+  const tg=Array.isArray(e.tags)?e.tags:String(e.tags||'').split(/[,、\s]+/);g.tagCands=tg.map(x=>String(x).trim()).filter(Boolean);
+  return g}
+function ensureGen(e){if(!e.gen||typeof e.gen!=='object')e.gen=genDefault(e);const g=e.gen;g.points=Array.isArray(g.points)?g.points:[];
+  if(isSetKind(g)&&!g._volsManual){const mv=memberVolsCsv(e);if(mv&&mv!==g.vols){g.vols=mv;syncWork(g)}}   // 束ねたメンバーが変わったら巻を作り直す
+  return g}
+function radioG(name,opts,cur){return `<div class="opts">${opts.map(([v,t])=>`<label><input type="radio" name="g_${name}" data-g="${name}" value="${v}"${cur===v?' checked':''}>${t}</label>`).join('')}</div>`}
+function genPanelHTML(e){const g=ensureGen(e);
+  return `<div class="gen"><h4>✨ タイトル・本文を自動生成</h4>
+  <div class="fld"><label>作品名</label><input data-g="work" value="${esc(g.work)}"></div>
+  <div class="grid2"><div class="fld"><label>著者名（任意）</label><input data-g="author" value="${esc(g.author)}"></div><div class="fld"><label>出版社（任意）</label><input data-g="publisher" value="${esc(g.publisher)}"></div></div>
+  <div class="fld"><label>本の概要（任意）</label><textarea data-g="outline" style="min-height:60px">${esc(g.outline)}</textarea></div>
+  <div class="gsec">種別</div>${radioG('kind',Object.entries(KIND),g.kind)}
+  <div class="grid2"><div class="fld"><label>${g.kind==='single'?'巻数':'開始巻'}</label><input data-g="from" inputmode="numeric" value="${esc(g.from)}"></div>${g.kind==='single'?'':`<div class="fld"><label>終了巻</label><input data-g="to" inputmode="numeric" value="${esc(g.to)}"></div>`}</div>
+  ${isSetKind(g)?`<div class="fld"><label>収録巻（束ねた巻から自動。例：1,2,3,5 や 1-15）</label><input data-g="vols" value="${esc(g.vols||'')}"></div>`:''}
+  <div class="gsec">初版</div>${radioG('shohan',[['all','全巻初版'],['part','一部初版'],['none','初版なし'],['unknown','未確認']],g.shohan)}
+  ${g.shohan==='part'?`<div class="fld"><label>初版の巻（例：1,3,5）</label><input data-g="shohanVols" value="${esc(g.shohanVols)}"></div>`:''}
+  <div class="gsec">帯</div>${radioG('obi',[['all','全巻帯付き'],['part','一部のみ'],['none','帯なし'],['unknown','未確認']],g.obi)}
+  ${g.obi==='part'?`<div class="fld"><label>帯付きの巻（例：10,14）</label><input data-g="obiVols" value="${esc(g.obiVols)}"></div>`:''}
+  <div class="gsec">特典・付属品</div>${radioG('tokutenOn',[['0','なし'],['1','あり']],g.tokuten||g._tok?'1':'0')}
+  ${(g.tokuten||g._tok)?`<div class="fld"><label>特典の内容</label><input data-g="tokuten" value="${esc(g.tokuten)}"></div>`:''}
+  <div class="gsec">状態の気になる点</div><div class="opts">${POINTS.map(p=>`<label><input type="checkbox" data-gp="${esc(p)}"${(g.points||[]).includes(p)?' checked':''}>${p}</label>`).join('')}</div>
+  <div class="fld"><label>関連タグ（任意・スペースかカンマ区切り）</label><input data-g="tags" value="${esc(g.tags)}"></div>
+  <div class="tchips" id="tagChips"></div>
+  <div class="gsec">プレビュー</div><div class="pvt" id="pvT"></div><div class="note" id="pvC"></div><div class="pvb mt1" id="pvB"></div>
+  <div class="btns mt2"><button class="btn sm" data-act="genCopy" data-w="t">タイトルをコピー</button><button class="btn sm" data-act="genCopy" data-w="b">本文をコピー</button><button class="btn sm" data-act="genCopy" data-w="both">両方コピー</button></div>
+  <div class="btns mt2"><button class="btn pri" data-act="genApply">出品タイトル・本文に反映する</button><button class="btn sm" data-act="genReset">商品情報から作り直す</button></div></div>`}
+function updGen(){if(!EDIT||!$('#pvT'))return;const g=EDIT.gen;const t=genTitle(g),n=[...t].length;
+  $('#pvT').textContent=t||'（作品名を入力してください）';$('#pvC').innerHTML=`${n}文字${n>40?' <span class="wn">40文字を超えています（メルカリの商品名上限）</span>':''}`;$('#pvB').textContent=genBody(g);
+  const cur=new Set(tagList(g.tags));$('#tagChips').innerHTML=tagCands(g).map(c=>`<button class="${cur.has(c)?'on':''}" data-act="tagTog" data-t="${esc(c)}">#${esc(c)}</button>`).join('')}
+function updLtCount(){const el=$('#ltC'),i=document.querySelector('#shB [data-f="listTitle"]');if(!el||!i)return;const n=[...i.value].length;el.innerHTML=`${n}文字${n>40?' <span class="wn">40文字を超えています</span>':''}`}
+// ---- 値下げ限界ライン（SSS の利益式 soldProfit をそのまま使う） ----
+const LIM_LV=[30,20,10,0];
+function limitPrice(e,c,lv){const prof=p=>soldProfit(Object.assign({},e,{soldPrice:p,soldCh:c,soldFee:'',soldShip:'',soldPack:'',soldOther:''}));
+  const cs=S.settings.ch[c];const fixed=(num(e.cost)||0)+fnum(e,'ship',num(cs.ship)||0)+fnum(e,'pack',num(S.settings.pack)||0)+fnum(e,'other',num(S.settings.other)||0);
+  const den=1-(num(cs.fee)||0)/100-lv/100;if(den<=0)return null;let p=Math.max(10,Math.ceil(fixed/den/10)*10);
+  for(let k=0;k<50&&p>10&&prof(p-10)>=(p-10)*lv/100;k++)p-=10;for(let k=0;k<200&&prof(p)<p*lv/100;k++)p+=10;return p}
+function limitHTML(e){const chs=CH.filter(c=>S.settings.ch[c].on);if(!chs.length)return '<div class="note">設定で販路をオンにしてください</div>';
+  const lp=num(e.listPrice);
+  return `<table class="fixt lim"><tr><th></th>${chs.map(c=>`<th>${esc(S.settings.ch[c].name)}</th>`).join('')}</tr>
+  ${LIM_LV.map(lv=>`<tr><td>${lv?`利益率${lv}%`:'損益分岐'}</td>${chs.map(c=>{const p=limitPrice(e,c,lv);return `<td class="num${p!=null&&lp>0&&lp<p?' wn':''}">${p==null?'—':yenT(p)}</td>`}).join('')}</tr>`).join('')}
+  ${lp>0?`<tr><td>出品価格での利益</td>${chs.map(c=>{const pr=soldProfit(Object.assign({},e,{soldPrice:lp,soldCh:c,soldFee:'',soldShip:'',soldPack:'',soldOther:''}));return `<td class="num">${yenT(pr)}<br><span class="mut">${pct(pr/lp)}</span></td>`}).join('')}</tr>`:''}</table>
+  <div class="note mt1">この価格まで下げても、その利益率を保てる下限です（原価・送料・梱包費・その他費用と各販路の手数料率から計算。10円単位）。${lp>0?'出品価格がラインを下回る欄は色付きで表示。':''}</div>`}
+function memoHTML(e){const book=isBook(e);const tpls=S.templates||[];
+  return `<div class="edsec"><div class="edh">出品メモ</div>
+  ${book?genPanelHTML(e):'<div class="note mb2">本・コミック以外の商品は、タイトル・本文を手入力してください（自動生成は本・コミックのみ）。</div>'}
+  <div class="fld"><label>出品タイトル</label><input data-f="listTitle" value="${esc(e.listTitle||'')}"><div class="note" id="ltC"></div></div>
+  <div class="fld"><label>出品本文</label><textarea data-f="listDesc" style="min-height:220px">${esc(e.listDesc||'')}</textarea></div>
+  <div class="btns"><button class="btn sm" data-act="memoCopy" data-w="t">タイトルをコピー</button><button class="btn sm" data-act="memoCopy" data-w="b">本文をコピー</button><button class="btn sm" data-act="memoCopy" data-w="both">両方コピー</button></div>
+  <div class="fld mt3"><label>出品価格</label><input data-f="listPrice" inputmode="numeric" value="${esc(e.listPrice??'')}"></div>
+  <div class="gsec">定型文</div>${tpls.length?`<div class="fld"><select id="tplSel">${tpls.map(t=>`<option value="${esc(t.id)}">${esc(t.name||'（名前なし）')}</option>`).join('')}</select></div>
+  <div class="btns"><button class="btn sm" data-act="tplIns">本文に挿入</button><button class="btn sm" data-act="tplCopy">コピー</button></div>`:'<div class="note">定型文がありません。</div>'}
+  <div class="note mt1">定型文の追加・編集・削除は設定タブの「定型文」で行えます。</div>
+  <div class="gsec">値下げ限界ライン</div><div id="limBox">${limitHTML(e)}</div></div>`}
+function tplSheet(id){const t=id?S.templates.find(x=>x.id===id):null;if(id&&!t){toast('定型文が見つかりません');return}
+  openSheet(t?'定型文を編集':'定型文を追加',`<div class="fld"><label>名前</label><input id="tpN" value="${esc(t?t.name:'')}"></div>
+  <div class="fld"><label>本文</label><textarea id="tpB" style="min-height:200px">${esc(t?t.body:'')}</textarea></div>
+  <div class="tchips">${['{商品名}','{価格}','{状態}','{今日}'].map(v=>`<button data-act="tplVar" data-v="${v}">${v}</button>`).join('')}</div>
+  <div class="note">変数をタップすると本文のカーソル位置に入ります。出品メモで挿入・コピーするとき、その商品の出品タイトル（無ければ商品名）・出品価格・状態・今日の日付に置き換わります。</div>
+  <div class="btns mt3"><button class="btn pri" data-act="tplSave" data-id="${t?esc(t.id):''}">保存</button>${t?`<button class="btn dng" data-act="tplDel" data-id="${esc(t.id)}">削除</button>`:''}<button class="btn" data-act="closeSheet">やめる</button></div>`)}
+// ---- POSTA バックアップの取り込み ----
+let POSTA_IMP=null;
+function postaCond(c){c=String(c||'').trim();if(!c)return '';if(c==='全体的に状態が悪い')return '状態が悪い';if(c==='新品、未使用')return '新品・未使用';return c}
+function postaParse(txt){let o=JSON.parse(txt);if(o&&o.data&&!Array.isArray(o.listings)&&Array.isArray(o.data.listings))o=o.data;
+  if(!o||typeof o!=='object'||(!Array.isArray(o.listings)&&!Array.isArray(o.templates)))throw new Error('POSTAのバックアップではありません');
+  const L=(Array.isArray(o.listings)?o.listings:[]).filter(l=>l&&typeof l==='object');const T=(Array.isArray(o.templates)?o.templates:[]).filter(t=>t&&typeof t==='object');
+  return{L,T}}
+function postaPlan(d){let merged=0,added=0,tpl=0;const seen=new Set((S.templates||[]).map(t=>(t.name||'')+'\u0000'+(t.body||'')));
+  for(const l of d.L){const it=(l.sssId&&getItem(l.sssId))||S.items.find(x=>x.postaId&&x.postaId===l.id);if(it)merged++;else added++}
+  for(const t of d.T){const k=String(t.title||t.name||'')+'\u0000'+String(t.body||'');if(!seen.has(k)){seen.add(k);tpl++}}return{merged,added,tpl}}
+function postaImportAsk(txt){const d=postaParse(txt);const r=postaPlan(d);POSTA_IMP=d;
+  openSheet('POSTAのバックアップを取り込む',`<div class="card"><table><tr><td>SSSの商品に付ける出品メモ</td><td class="num">${r.merged}件</td></tr><tr><td>「候補」として新しく入れる出品メモ</td><td class="num">${r.added}件</td></tr><tr><td>追加する定型文（同じものは除く）</td><td class="num">${r.tpl}件</td></tr></table>
+  <div class="note mt2">出品メモの タイトル・本文・出品価格・生成の入力 を取り込みます。売却記録・計算履歴は取り込みません。在庫・相場・帳簿は変わりません。</div></div>
+  <div class="btns mt3"><button class="btn pri" data-act="postaImpDo">取り込む</button><button class="btn" data-act="closeSheet">やめる</button></div>`)}
+function postaImportApply(d){let merged=0,added=0,tpl=0;const nz=v=>v!==undefined&&v!==null&&String(v).trim()!=='';
+  for(const l of d.L){let it=(l.sssId&&getItem(l.sssId))||S.items.find(x=>x.postaId&&x.postaId===l.id);const price=num(l.price);
+    const gen=l.gen&&typeof l.gen==='object'?JSON.parse(JSON.stringify(l.gen)):null;
+    if(it){if(nz(l.title))it.listTitle=String(l.title);if(nz(l.desc))it.listDesc=String(l.desc);if(price>0)it.listPrice=price;if(gen)it.gen=gen;it.postaId=String(l.id||'');it.updated=new Date().toISOString();merged++}
+    else{const d0=l.createdAt?ymd(new Date(l.createdAt)):today();
+      it=newItem({name:String(l.title||(gen&&gen.work)||'（POSTAの出品メモ）'),st:'cand',cat:BOOK,date:d0,listTitle:String(l.title||''),listDesc:String(l.desc||''),listPrice:price>0?price:'',
+        cost:num(l.cost)>0?num(l.cost):'',cond:postaCond(l.condition),author:gen?String(gen.author||''):'',pub:gen?String(gen.publisher||''):'',code:gen?String(gen.isbn||''):'',memo:String(l.note||''),postaId:String(l.id||'')});
+      if(gen)it.gen=gen;S.items.unshift(it);added++}}
+  const seen=new Set((S.templates||[]).map(t=>(t.name||'')+'\u0000'+(t.body||'')));
+  for(const t of d.T){const name=String(t.title||t.name||''),body=String(t.body||'');const k=name+'\u0000'+body;if(seen.has(k))continue;seen.add(k);S.templates.push({id:uid(),name,body,cat:String(t.category||'')});tpl++}
+  save();return{merged,added,tpl}}
+
 /* ---------- 設定 ---------- */
 function setHTML(){
   const s=S.settings;const size=new Blob([JSON.stringify(S)]).size;const qn=S.items.reduce((a,i)=>a+(i.quotes||[]).length,0);
@@ -1246,7 +1436,10 @@ function setHTML(){
   ${S.links.map((l,i)=>`<div class="fld"><div class="row"><input data-link="${i}" data-k="name" value="${esc(l.name)}" class="grow"><button class="btn sm" data-act="linkUp" data-i="${i}">↑</button><button class="btn sm dng" data-act="linkDel" data-i="${i}">削除</button></div><input data-link="${i}" data-k="url" value="${esc(l.url)}" class="mt1"></div>`).join('')}
   <div class="btns"><button class="btn" data-act="linkAdd">＋ボタンを追加</button><button class="btn" data-act="linkReset">初期のボタンに戻す</button></div>
   <div class="note mt2">リンクは外部サイトを開くだけで、データの自動取得はしません。</div></div>
-  <div class="sec">POSTA連携</div><div class="card"><div class="fld"><label>POSTAのURL</label>${inp('postaUrl',s.postaUrl)}</div></div>
+  <div class="sec">定型文（出品メモで使います）</div><div class="card">${(S.templates||[]).map(t=>`<div class="qrow" data-act="tplOpen" data-id="${esc(t.id)}" style="cursor:pointer"><span class="grow"><b>${esc(t.name||'（名前なし）')}</b><br><span class="mut">${esc(String(t.body||'').slice(0,40))}${String(t.body||'').length>40?'…':''}</span></span><span>›</span></div>`).join('')||'<div class="note">定型文はありません</div>'}
+  <div class="btns mt2"><button class="btn" data-act="tplOpen">＋定型文を追加</button></div><div class="note mt1">{商品名} {価格} {状態} {今日} が使えます（出品メモで挿入・コピーするときに置き換わります）。</div></div>
+  <div class="sec">POSTAから移行</div><div class="card"><div class="note mb2">旧POSTAの「データ」→書き出し で保存したバックアップ（posta_backup_*.json）を読み込み、出品メモと定型文をSSSに移します。売却記録・計算履歴は取り込みません。在庫・相場・帳簿のデータは変わりません。</div>
+  <label class="btn">📥 POSTAのバックアップを取り込む<input type="file" id="postaF" accept=".json,application/json,text/plain" hidden></label></div>
   <div class="sec">データ</div><div class="card sum">
   商品 <b>${S.items.length}</b> 件／相場 <b>${qn}</b> 件／カゴ <b>${S.queue.length}</b> 件<br>
   使用量 約 <b>${size>1048576?(size/1048576).toFixed(2)+' MB':(size/1024).toFixed(1)+' KB'}</b>（iPhoneのSafariは1サイトあたり約5MBが目安）<br>
@@ -1545,6 +1738,25 @@ const ACT={
     EDIT.quotes=EDIT.quotes||[];EDIT.quotes.push(normQuote({price:p,status:$('#nqS').value,src:$('#nqC').value,cond:$('#nqD').value,date:$('#nqT').value||today(),title:EDIT.name,imp:'manual'}));drawEditorKeep();toast('追加しました（保存を押すと確定）')},
   csvForEdit(){const e=saveEditor();if(!e)return;csvOpen(e.id,e.name)},
   saveItem(){if(saveEditor()){closeSheet();render()}},
+  genApply(){readEditor();const g=EDIT.gen;if(!String(g.work||'').trim()){toast('作品名を入力してください');return}const t=genTitle(g),d=genBody(g);
+    if(!(EDIT.listTitle&&EDIT.listTitle!==t&&!confirm('出品タイトルに入力済みの内容を、生成したタイトルで上書きしますか？')))EDIT.listTitle=t;
+    if(!(EDIT.listDesc&&EDIT.listDesc!==d&&!confirm('出品本文に入力済みの内容を、生成した本文で上書きしますか？')))EDIT.listDesc=d;
+    drawEditorKeep();toast('反映しました（「保存」で確定します）')},
+  genCopy(b){const g=EDIT.gen;if(!String(g.work||'').trim()){toast('作品名を入力してください');return}const t=genTitle(g),d=genBody(g);copyText(b.dataset.w==='t'?t:b.dataset.w==='b'?d:t+'\n\n'+d)},
+  memoCopy(b){readEditor();const t=String(EDIT.listTitle||''),d=String(EDIT.listDesc||'');const w=b.dataset.w;const v=w==='t'?t:w==='b'?d:[t,d].filter(Boolean).join('\n\n');if(!v){toast('コピーする内容がありません');return}copyText(v)},
+  tagTog(b){readEditor();const g=EDIT.gen;const t=b.dataset.t;let a=tagList(g.tags);a=a.includes(t)?a.filter(x=>x!==t):[...a,t];g.tags=a.join(' ');const i=document.querySelector('[data-g="tags"]');if(i)i.value=g.tags;updGen()},
+  genReset(){if(!confirm('生成パネルの入力を、商品の情報から作り直しますか？'))return;readEditor();EDIT.gen=genDefault(EDIT);drawEditorKeep()},
+  tplIns(){const t=S.templates.find(x=>x.id===($('#tplSel')||{}).value);if(!t){toast('定型文を選んでください');return}readEditor();const ta=document.querySelector('#shB [data-f="listDesc"]');const v=fillTpl(t.body,EDIT);
+    const s0=ta.selectionStart??ta.value.length,e0=ta.selectionEnd??s0;const at=document.activeElement===ta?s0:ta.value.length;const pre=ta.value.slice(0,at),post=ta.value.slice(document.activeElement===ta?e0:at);
+    ta.value=pre+(pre&&!pre.endsWith('\n')?'\n':'')+v+post;EDIT.listDesc=ta.value;toast('本文に挿入しました')},
+  tplCopy(){const t=S.templates.find(x=>x.id===($('#tplSel')||{}).value);if(!t){toast('定型文を選んでください');return}readEditor();copyText(fillTpl(t.body,EDIT))},
+  tplOpen(b){tplSheet(b.dataset.id||null)},
+  tplSave(b){const name=$('#tpN').value.trim(),body=$('#tpB').value;if(!name&&!body.trim()){toast('名前か本文を入力してください');return}
+    const id=b.dataset.id;if(id){const t=S.templates.find(x=>x.id===id);if(t)Object.assign(t,{name:name||body.trim().slice(0,16),body,updated:new Date().toISOString()})}
+    else S.templates.push({id:uid(),name:name||body.trim().slice(0,16),body,created:new Date().toISOString()});save();closeSheet();render();toast('定型文を保存しました')},
+  tplDel(b){const t=S.templates.find(x=>x.id===b.dataset.id);if(!t||!confirm(`定型文「${t.name}」を削除しますか？`))return;S.templates=S.templates.filter(x=>x!==t);save();closeSheet();render();toast('削除しました')},
+  tplVar(b){const ta=$('#tpB');const s0=ta.selectionStart??ta.value.length,e0=ta.selectionEnd??s0;ta.value=ta.value.slice(0,s0)+b.dataset.v+ta.value.slice(e0);ta.focus();const q=s0+b.dataset.v.length;ta.setSelectionRange(q,q)},
+  postaImpDo(){if(!POSTA_IMP)return;const r=postaImportApply(POSTA_IMP);POSTA_IMP=null;closeSheet();render();toast(`POSTAから取り込みました：既存商品に${r.merged}件・候補として${r.added}件・定型文${r.tpl}件`)},
   judgeItem(){const e=saveEditor();if(!e)return;closeSheet();setTab('look');CUR={code:normCode(e.code),itemId:e.id,title:e.name,author:e.author||'',pub:e.pub||'',cover:itemCover(e),price:''};renderCalc();renderResult();updatePV();focusRes()},
   delItem(){if(!EDIT||!confirm(`「${EDIT.name}」を削除しますか？（相場${(EDIT.quotes||[]).length}件も消えます）`))return;S.items=S.items.filter(x=>String(x.id)!==String(EDIT.id));save();closeSheet();toast('削除しました');render()},
   statsAxis(b){UI.statsAxis=b.dataset.v;render()},
@@ -1595,6 +1807,13 @@ document.addEventListener('keydown',e=>{
   if(e.key==='Enter'&&e.target.id==='manTitle'){e.preventDefault();ACT.setManTitle()}
 });
 document.addEventListener('input',e=>{
+  if(EDIT&&e.target.dataset.g&&e.target.type!=='radio'){const el=e.target,g=EDIT.gen,k=el.dataset.g;g[k]=el.value;if(k==='work')g._workAuto=0;
+    if(isSetKind(g)&&(k==='vols'||k==='from'||k==='to')){if(k==='vols')g._volsManual=el.value.trim()?1:0;
+      else if(!g._volsManual){const f=num(g.from),t=num(g.to)||f;g.vols=f?volsCsv(`${f}-${Math.max(f,t)}`):'';const vi=document.querySelector('[data-g="vols"]');if(vi)vi.value=g.vols}
+      syncWork(g);const wi=document.querySelector('[data-g="work"]');if(wi&&document.activeElement!==wi)wi.value=g.work}
+    updGen();return}
+  if(EDIT&&e.target.dataset.f==='listTitle'){updLtCount();return}
+  if(EDIT&&['cost','ship','pack','other','listPrice'].includes(e.target.dataset.f)){readEditor();const lb=$('#limBox');if(lb)lb.innerHTML=limitHTML(EDIT);return}
   if(e.target.dataset.calc){const rows=calcRows();rows[+e.target.dataset.i][e.target.dataset.calc]=e.target.value;renderCalc();const el=document.querySelector('[data-calc="'+e.target.dataset.calc+'"][data-i="'+e.target.dataset.i+'"]');if(el){el.focus();const p=el.value.length;try{el.setSelectionRange(p,p)}catch(_){}}return}
   if(e.target.id==='hq'){UI.hq=e.target.value;clearTimeout(UI.hqT);UI.hqT=setTimeout(()=>{const pos=e.target.selectionStart;render();const el=$('#hq');if(el){el.focus();try{el.setSelectionRange(pos,pos)}catch(_){}}},250);return}
   if(e.target.id==='lq'){UI.listQ=e.target.value;clearTimeout(UI.lqT);UI.lqT=setTimeout(()=>{const pos=e.target.selectionStart;render();const el=$('#lq');if(el){el.focus();try{el.setSelectionRange(pos,pos)}catch(_){}}},250)}
@@ -1606,6 +1825,10 @@ document.addEventListener('change',e=>{
     const k=path[path.length-1];let v=el.type==='checkbox'?el.checked:el.value;
     if(el.type!=='checkbox'&&el.inputMode&&/numeric|decimal/.test(el.inputMode)&&k!=='budget'){const n=num(v);v=isFinite(n)?n:o[k]}
     o[k]=v;save();if(UI.tab!=='look')render();else renderResult();return}
+  if(el.id==='postaF'&&el.files&&el.files[0]){const f=el.files[0];el.value='';f.text().then(t=>{try{postaImportAsk(t)}catch(err){toast(err.message||'読み込めませんでした')}});return}
+  if(EDIT&&el.dataset.g&&el.type==='radio'){readEditor();const g=EDIT.gen;const k=el.dataset.g;if(k==='tokutenOn'){if(el.value==='0'){g.tokuten='';g._tok=0}else g._tok=1}else{g[k]=el.value;if(k==='kind'){if(isSetKind(g)&&!g.vols){const mv=memberVolsCsv(EDIT);if(mv)g.vols=mv;else if(num(g.from)){const f=num(g.from),t=num(g.to)||f;g.vols=volsCsv(`${f}-${Math.max(f,t)}`)}}syncWork(g)}}drawEditorKeep();return}
+  if(EDIT&&el.dataset.gp!==undefined){readEditor();const g=EDIT.gen;const p=el.dataset.gp;let a=(g.points||[]).filter(x=>x!==p);if(el.checked){if(p==='特になし（きれい）')a=[p];else a=a.filter(x=>x!=='特になし（きれい）').concat(p)}g.points=POINTS.filter(x=>a.includes(x));drawEditorKeep();return}
+  if(EDIT&&el.dataset.f==='cat'&&el.value!=='__custom'){readEditor();drawEditorKeep();return}
   if(el.id==='huntF'&&el.files&&el.files[0]){const f=el.files[0];el.value='';f.text().then(t=>{try{const r=huntImport(t);toast(`探し物リスト：追加${r.add}件・更新${r.upd}件（全${r.total}件）${r.bad?`・読めない行${r.bad}件`:''}`);render()}catch(err){toast(err.message||'読み込めません')}});return}
   if(el.dataset.lsel2!==undefined){UI.listSel[el.dataset.lsel2]=el.checked;render();return}
   if(el.dataset.lsel!==undefined){const v=el.value;const mp={cat:'listCat',genre:'listG',pub:'listP',cond:'listC',store:'listStore',setk:'listK',month:'listM'};const uk=mp[el.dataset.lsel];if(uk){UI[uk]=v;UI.listN=150;render()}return}
