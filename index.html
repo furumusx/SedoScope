@@ -120,7 +120,7 @@ tr.best{color:var(--ss)}
 .list .it .s{font-size:var(--fs-sub);color:var(--mut)}
 .list .it .r{text-align:right;flex:none}
 .st{font-size:11px;border-radius:var(--r-sm);padding:var(--sp1) var(--sp2);border:1px solid var(--line);margin-right:var(--sp1)}
-.st.cand{color:#c8b6ff;border-color:#4a3f75}.st.stock{color:#8fd3ff;border-color:#25506b}.st.listed{color:#ffd98a;border-color:#6b4d12}.st.sold{color:#9be7b6;border-color:#1f5a37}
+.st.cand{color:#c8b6ff;border-color:#4a3f75}.st.stock{color:#8fd3ff;border-color:#25506b}.st.listed{color:#ffd98a;border-color:#6b4d12}.st.sold{color:#9be7b6;border-color:#1f5a37}.st.deal{color:#ffb38a;border-color:#6b3a1f}
 .minisig{display:inline-flex;width:30px;height:30px;border-radius:var(--r-sm);border:2px solid;align-items:center;justify-content:center;font-weight:800}
 .minisig.ss{color:var(--ss)}.minisig.s{color:var(--s)}.minisig.w{color:var(--w);border-style:dashed}.minisig.x{color:var(--x)}.minisig.n{color:var(--mut);border-color:var(--line)}
 .it.pick{border-color:var(--ss)!important;box-shadow:inset 0 0 0 1px var(--ss)}
@@ -194,6 +194,14 @@ input[type="date"]{min-width:0;max-width:100%}
 .list .it.stc-sold{border-left:4px solid var(--ss)}
 .list .it.stc-listed{border-left:4px solid var(--w)}
 .list .it.stc-cand{border-left:4px solid #4a3f75}
+.list .it.stc-deal{border-left:4px solid #ff9a5c}
+.hsub{font-size:var(--fs-sub);color:var(--mut);margin:var(--sp3) var(--sp1) var(--sp1);font-weight:600}
+.pnav{display:flex;align-items:center;gap:var(--sp2);margin-bottom:var(--sp2)}.pnav b{flex:1;text-align:center;font-size:var(--fs-sec)}
+.pl{width:100%;border-collapse:collapse}.pl td{padding:var(--sp1) 0;border-bottom:1px solid var(--line)}.pl td:last-child{text-align:right}
+.pl tr.sub td{color:var(--mut);font-size:var(--fs-sub);padding-left:var(--sp3)}.pl tr.tot td{font-weight:800;border-bottom:none;font-size:var(--fs-sec)}
+.pl .neg{color:var(--x)}
+.exrow{display:flex;gap:var(--sp2);padding:var(--sp2) 0;border-bottom:1px solid var(--line);cursor:pointer}.exrow:last-child{border-bottom:none}
+.chart svg{width:100%;height:auto;display:block}.lg{display:flex;gap:var(--sp3);font-size:var(--fs-sub);color:var(--mut);margin-top:var(--sp1)}.lg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
 </style>
 </head>
 <body>
@@ -220,9 +228,10 @@ input[type="date"]{min-width:0;max-width:100%}
    データ: localStorage "sedoscope_s_v1"（SedoScope本体 "sedoscope_v1" とは別）
    外部通信: openBD ISBN照会のみ
    ============================================================ */
-const APP_VER='1.5.0';
+const APP_VER='1.6.0';
 const APP_DATE='2026-10-24';
 const CHANGELOG=[
+  'v1.6.0（2026-10-27）収支・経費帳簿を追加（集計タブの「収支」：月ごとの売上・売上コスト・経費・純利益、12ヶ月の推移、経費の記録、収支CSV）。ステータス「取引中」を追加。商品と探し物リストにカテゴリ（本・コミック／トレカ／CD・音楽／古着／ゲーム／その他）を追加し、本専用の機能は本・コミックだけに効くようにした。',
   'v1.5.0（2026-10-27）相場CSVの「貼り付け」取り込みが読まれていなかった不具合を修正。タブを4つ（調べる／一覧／集計／設定）にし、カゴを廃止。「調べる」は探し物チェックリスト専用（出版社別・所持巻・確認日・絞り込み検索）にした。保存済みのカゴのデータは消さずに残している。',
   'v1.4.9（2026-10-27）探し物リスト連携：判定の照合先を探し物リスト優先にし（買い上限はリストの値、所持巻は在庫から自動表示）、調べるタブに探し物リスト区画を追加。一覧に「読み取りで追加」（仕入価格を入れてバーコードを連続読み取り→仕入済みに登録、同じ巻の在庫があれば注意）を追加。',
   'v1.4.8（2026-10-26）一覧の束ねで、違う作品の単巻も『まとめ売り』として束ねられるようにした（商品名は束ねる時に編集可能。想定売価はメンバー単巻の想定売価の合計で表示）。',
@@ -245,7 +254,10 @@ const CHANGELOG=[
 ];
 const KEY='sedoscope_s_v1';
 const CH=['m','y','r','a'];
-const ST={cand:'候補',stock:'仕入済',listed:'出品中',sold:'売却済'};
+const ST={cand:'候補',stock:'仕入済',listed:'出品中',deal:'取引中',sold:'売却済'};
+const CATS=['本・コミック','トレカ','CD・音楽','古着','ゲーム','その他'];const BOOK='本・コミック';
+const EXCATS=['仕入高','荷造運賃','支払手数料','通信費','消耗品費','旅費交通費','広告宣伝費','その他'];
+const catOf=x=>String((x&&x.cat)||'').trim()||BOOK;const isBook=x=>catOf(x)===BOOK;
 const SIG={ss:['◎','買え'],s:['○','買え'],w:['△','要確認'],x:['✕','見送り'],n:['—','相場なし']};
 const ACC=[['obi','帯'],['cover','カバー'],['booklet','特典冊子'],['poster','ポスター'],['other','その他']];
 const EDS=['完全版','文庫版','愛蔵版','新装版','ワイド版','カラー版','デラックス版','復刻版','豪華版','新書版','大判','KCDX','B6判','A5判'];
@@ -265,7 +277,7 @@ function defSettings(){return{
   acc:{obi:10,cover:30,booklet:10,poster:5,other:0},
   store:'',stores:[],budget:'',autoQueue:false,postaUrl:'https://furumusx.github.io/posta/',
 }}
-function defState(){return{schema:1,items:[],hunt:[],queue:[],biblio:{},settings:defSettings(),links:DEF_LINKS.map(x=>({...x})),
+function defState(){return{schema:1,items:[],hunt:[],expenses:[],queue:[],biblio:{},settings:defSettings(),links:DEF_LINKS.map(x=>({...x})),
   meta:{created:new Date().toISOString(),lastBackup:null,imports:[]}}}
 
 /* ---------- 保存 ---------- */
@@ -279,6 +291,8 @@ function fixState(s){
   s.settings=Object.assign(ds,ss,{ch,acc:Object.assign({},ds.acc,ss.acc||{})});
   s.links=Array.isArray(s.links)?s.links:d.links;
   s.hunt=Array.isArray(s.hunt)?s.hunt:[];
+  s.expenses=Array.isArray(s.expenses)?s.expenses.filter(x=>x&&typeof x==='object'):[];
+  for(const it of s.items)if(!it.cat)it.cat=BOOK;   // v1.6.0：既存アイテムは本・コミック
   s.meta=Object.assign(d.meta,s.meta||{});
   s.schema=1; return s;
 }
@@ -352,6 +366,7 @@ function normQuote(q){
   o.title=String(q.title??q.name??q.n??q['商品名']??'');
   return o}
 function normSt(v){if(ST[v])return v;const t=String(v??'').normalize('NFKC').toLowerCase();
+  if(/deal|取引中/.test(t))return 'deal';
   if(/sold|売却|売れ|販売済|done/.test(t))return 'sold';
   if(/list|出品/.test(t))return 'listed';
   if(/stock|inv|bought|purch|仕入|在庫|own|have/.test(t))return 'stock';
@@ -359,13 +374,13 @@ function normSt(v){if(ST[v])return v;const t=String(v??'').normalize('NFKC').toL
   return {'0':'cand','1':'stock','2':'listed','3':'sold'}[t]||'cand'}
 const qKey=q=>[q.title,q.price,q.status,q.cond,q.ch].join('|');
 function getItem(id){return S.items.find(x=>String(x.id)===String(id))||null}
-function newItem(o){return Object.assign({id:uid(),name:'',code:'',st:'cand',date:today(),quotes:[],created:new Date().toISOString()},o)}
+function newItem(o){return Object.assign({id:uid(),name:'',code:'',st:'cand',cat:BOOK,date:today(),quotes:[],created:new Date().toISOString()},o)}
 function itemCover(it){return it&&(it.cover||(S.biblio[normCode(it.code)]||{}).cover)||''}
 
 /* ---------- 相場プール ---------- */
 function index(){
   if(IDX)return IDX;const by=new Map(),keyOf=new Map();
-  for(const it of S.items){const k=workKey(it.work||it.name);keyOf.set(it,k);if(!k)continue;if(!by.has(k))by.set(k,[]);by.get(k).push(it)}
+  for(const it of S.items){if(!isBook(it))continue;const k=workKey(it.work||it.name);keyOf.set(it,k);if(!k)continue;if(!by.has(k))by.set(k,[]);by.get(k).push(it)}
   return IDX={by,keyOf};
 }
 const itemKey=it=>index().keyOf.get(it)??workKey(it.work||it.name);
@@ -377,7 +392,7 @@ function poolItemsFor(key,broad){
 }
 // 判定用：正規化名が完全一致する商品だけ（版違い・部分セットを混ぜない）
 const nname=s=>String(s??'').normalize('NFKC').trim();
-function exactItemsFor(it){const n=nname(it&&it.name);if(!n)return it?[it]:[];return S.items.filter(x=>nname(x.name)===n)}
+function exactItemsFor(it){const n=nname(it&&it.name);if(!n)return it?[it]:[];const c=catOf(it);return S.items.filter(x=>nname(x.name)===n&&catOf(x)===c)}
 // 最頻価格帯：各価格pを起点に[p, p×1.25]に入る価格の集合で、件数最大（同数なら平均が全体の中央値に最も近い）の帯
 function modeBand(prices){
   const a=[...prices].sort((x,y)=>x-y);if(!a.length)return null;const med=median(a);let best=null;
@@ -427,6 +442,7 @@ function dupInfo(code,exId){
   const c=normCode(code);if(!c)return [];const out=[];
   for(const it of S.items){if(String(it.id)===String(exId)||normCode(it.code)!==c)continue;
     if(it.st==='stock'||it.st==='listed')out.push({lv:'bad',t:`${ST[it.st]}に同じISBNあり`,id:it.id});
+    else if(it.st==='deal')out.push({lv:'warn',t:'取引中に同じISBNあり',id:it.id});
     else if(it.st==='sold'){const d=daysAgo(it.soldDate||it.date);if(d!==null&&d<=S.settings.dupDays)out.push({lv:'warn',t:`${d}日前に売却済み`,id:it.id})}
     else out.push({lv:'info',t:'候補に登録済み',id:it.id})}
   return out}
@@ -438,14 +454,14 @@ function accFactor(it){let f=1;const miss=[];
 const hkey=e=>workKey(e.work||e.title);
 function keyMatch(a,b){if(!a||!b)return false;if(a===b)return true;const s1=a.length<=b.length?a:b,l=a.length<=b.length?b:a;return s1.length>=3&&l.includes(s1)}
 function itemVols(it){if(it.have){const s=parseVols(it.have);if(s.size)return s}const r=itemRangeOf(it);const out=new Set();if(r)for(let v=r[0];v<=r[1];v++)out.add(v);return out}
-function huntInv(e){const k=hkey(e);return S.items.filter(it=>(it.st==='stock'||it.st==='listed')&&!it.mixed&&keyMatch(k,itemKey(it)))}
+function huntInv(e){if(!isBook(e))return [];const k=hkey(e);return S.items.filter(it=>(it.st==='stock'||it.st==='listed')&&isBook(it)&&!it.mixed&&keyMatch(k,itemKey(it)))}   // 取引中・売却済は所持に数えない
 function ownedVols(e){const set=new Set();for(const it of huntInv(e))for(const v of itemVols(it))set.add(v);return set}
 function huntHit(key){if(!key||!S.hunt||!S.hunt.length)return null;return S.hunt.find(e=>keyMatch(hkey(e),key))||null}
 function isSetCtx(it,title){if(it){if(it.mixed||/セット/.test(String(it.setk||'')+String(it.name||'')))return true;const r=itemRangeOf(it);return !!(r&&r[1]>r[0])}
   const t=String(title||'');if(/セット|全巻/.test(t))return true;const r=volRangeOfName(t);return !!(r&&r[1]>r[0])}
 function huntNorm(o){if(!o||typeof o!=='object')return null;const n=v=>{const x=num(v);return isFinite(x)&&x>0?x:null};
   const title=String(o.title||o.work||'').trim();if(!title)return null;
-  return{work:String(o.work||'').trim(),title,publisher:String(o.publisher||o.pub||'').trim(),vols:o.vols??'',median:n(o.median),perVolCap:n(o.perVolCap),setCap:n(o.setCap),memo:String(o.memo||''),provisional:o.provisional?1:0,checked:String(o.checked||'')}}
+  return{cat:String(o.cat||o.category||'').trim()||BOOK,work:String(o.work||'').trim(),title,publisher:String(o.publisher||o.pub||'').trim(),vols:o.vols??'',median:n(o.median),perVolCap:n(o.perVolCap),setCap:n(o.setCap),memo:String(o.memo||''),provisional:o.provisional?1:0,checked:String(o.checked||'')}}
 function huntImport(txt){const o=JSON.parse(txt);const arr=Array.isArray(o)?o:(o&&(o.hunt||o.items||o.list||o.data));if(!Array.isArray(arr))throw new Error('探し物リストの形式ではありません');
   let add=0,upd=0,bad=0;for(const r of arr){const e=huntNorm(r);if(!e){bad++;continue}const i=S.hunt.findIndex(x=>x.title===e.title);if(i>=0){S.hunt[i]=e;upd++}else{S.hunt.push(e);add++}}
   save();return{add,upd,bad,total:S.hunt.length}}
@@ -456,14 +472,15 @@ function analyze(ctx){
   const it=ctx.itemId?getItem(ctx.itemId):(ctx.vitem||null);
   const title=ctx.title||(it&&it.name)||'';
   const key=it?itemKey(it):workKey(ctx.work||title);
-  let pool=poolItemsFor(key,true);if(it&&!pool.includes(it))pool.unshift(it);   // 欠巻・版違い用（作品単位）
+  const nb=!!(it&&!isBook(it));   // 本以外：相場プール・巻数まわりは使わない
+  let pool=nb?[]:poolItemsFor(key,true);if(it&&!pool.includes(it))pool.unshift(it);   // 欠巻・版違い用（作品単位）
   let ex,prov=false,grp='name';                                                              // 判定用（同じ商品名→同じ巻範囲）
   if(ctx.vitem){ex=[ctx.vitem]}
   else if(it&&it.mixed)ex=[];   // まとめ売りは自分の名前では相場を見ない（想定売価はメンバー合計）
   else if(it)ex=exactItemsFor(it);
   else{const n=nname(title);ex=n?S.items.filter(x=>nname(x.name)===n):[];if(!ex.length){ex=poolItemsFor(key);prov=ex.length>0}}
   const qsAll=poolQuotes(ex,key);let qs=qsAll;
-  if(it&&!prov&&!ctx.vitem&&!it.mixed){const tn=tnorm(it.name);qs=qsAll.filter(q=>!q.title||tnorm(q.title)===tn);qs.nameExcluded=qsAll.length-qs.length;
+  if(it&&!prov&&!ctx.vitem&&!it.mixed&&!nb){const tn=tnorm(it.name);qs=qsAll.filter(q=>!q.title||tnorm(q.title)===tn);qs.nameExcluded=qsAll.length-qs.length;
     const soldN=qs.filter(q=>q.status==='sold').length;
     if(soldN<3){const rng=itemRangeOf(it);if(rng){let rq=rangeQuotes(key,rng[0],rng[1]);
       if(rq.filter(q=>q.status==='sold').length<=soldN){const lk=workKey(String(it.name).split(/[=＝]/)[0].replace(/[A-Za-z0-9.]+/g,' '));if(lk&&lk!==key){const rq2=rangeQuotes(lk,rng[0],rng[1]);if(rq2.filter(q=>q.status==='sold').length>rq.filter(q=>q.status==='sold').length)rq=rq2}}
@@ -495,8 +512,8 @@ function analyze(ctx){
     bimodal:bimodal(st.sp),
     stale:st.soldN>0&&(sd===null||sd>num(set.fresh)),staleDays:sd,
     few:st.soldN<3,
-    vol:volCheck(it,pool),
-    ed:editionNote(title,pool,it),
+    vol:nb?null:volCheck(it,pool),
+    ed:nb?[]:editionNote(title,pool,it),
     dup:dupInfo(ctx.code||(it&&it.code),ctx.scan?null:(it&&it.id)),
     acc:acc.miss,
     memSum:!!(it&&it.mixed),memMiss,
@@ -550,7 +567,7 @@ async function fetchBiblio(isbn){
 /* ============================================================
    画面
    ============================================================ */
-const UI={scroll:{look:0,cart:0,list:0,stats:0,set:0},tab:'look',listF:'all',listQ:'',listN:150,cartSort:'eff',per:'month',padOpen:true,search:null,listG:'',listP:'',listC:'',listStore:'',listK:'',listM:'',statsAxis:'all',cartSel:{},listSel:{},listSelMode:false};
+const UI={scroll:{look:0,cart:0,list:0,stats:0,set:0},tab:'look',listF:'all',listQ:'',listN:150,cartSort:'eff',per:'month',padOpen:true,search:null,listCat:'',pnlM:'',listG:'',listP:'',listC:'',listStore:'',listK:'',listM:'',statsAxis:'all',cartSel:{},listSel:{},listSelMode:false};
 let CUR=null;   // 調べている本 {code,title,author,pub,cover,itemId,price,loading,netErr}
 
 function setTab(t){
@@ -598,14 +615,21 @@ function updatePV(){const e=$('#pv');if(e)e.textContent=CUR&&CUR.price!==''&&CUR
 function huntPage(){const L=S.hunt||[];
   if(!L.length)return `<div class="empty">📋 探し物リストはまだありません。<br>設定タブの「探し物リストを取り込む」から、探し物リスト（JSON）を読み込んでください。<br><button class="btn pri mt3" data-tab="set">設定タブを開く</button></div>`;
   const q=String(UI.hq||'').normalize('NFKC').toLowerCase();
-  const hit=L.map((e,i)=>[e,i]).filter(([e])=>!q||[e.title,e.work,e.publisher].join(' ').normalize('NFKC').toLowerCase().includes(q));
-  const groups={};hit.forEach(([e,i])=>{const k=e.publisher||'（出版社なし）';(groups[k]=groups[k]||[]).push([e,i])});const fresh=num(S.settings.fresh)||30;
-  return `<div class="srch"><input id="hq" type="search" placeholder="作品名・出版社で絞り込み" value="${esc(UI.hq||'')}"></div>
-  <div class="note mb2">📋 探し物リスト ${hit.length}${q?` / ${L.length}`:''}件　所持巻は在庫（仕入済・出品中）から自動で計算しています。</div>
-  ${Object.keys(groups).sort().map(g=>`<div class="sec">${esc(g)}（${groups[g].length}）</div><div class="card">${groups[g].map(([e,i])=>{const o=[...ownedVols(e)].sort((x,y)=>x-y);const d=e.checked?daysAgo(e.checked):null;
+  const hit=L.map((e,i)=>[e,i]).filter(([e])=>!q||[e.title,e.work,e.publisher,catOf(e)].join(' ').normalize('NFKC').toLowerCase().includes(q));
+  const fresh=num(S.settings.fresh)||30;
+  const byCat={};hit.forEach(x=>{const c=catOf(x[0]);(byCat[c]=byCat[c]||[]).push(x)});
+  const cats=Object.keys(byCat).sort((a,b)=>{const ia=CATS.indexOf(a),ib=CATS.indexOf(b);return (ia<0?99:ia)-(ib<0?99:ib)||a.localeCompare(b)});
+  const multi=L.some(e=>!isBook(e));
+  const row=([e,i])=>{const bk=isBook(e);const o=bk?[...ownedVols(e)].sort((x,y)=>x-y):[];const d=e.checked?daysAgo(e.checked):null;
     return `<div class="hrow" data-act="huntOpen" data-i="${i}"><div class="grow"><div class="t">${esc(e.title)}${e.provisional?' <span class="st listed">要再調査</span>':''}</div>
-    <div class="s">中央値 ${e.median?yenT(e.median):'—'}・${e.perVolCap?`単巻上限 ${yenT(e.perVolCap)}`:''}${e.perVolCap&&e.setCap?'・':''}${e.setCap?`セット上限 ${yenT(e.setCap)}`:''}${!e.perVolCap&&!e.setCap?'上限なし':''}・所持：${o.length?esc(compactVols(o)):'なし'}</div>
-    ${e.memo?`<div class="s">${esc(e.memo)}</div>`:''}</div><div class="hd ${d!==null&&d>fresh?'old':''}">${e.checked?`確認 ${esc(e.checked.slice(5))}${d!==null&&d>fresh?'<br>古い':''}`:'確認日なし'}</div></div>`}).join('')}</div>`).join('')||'<div class="empty">該当する作品はありません。</div>'}`}
+    <div class="s">中央値 ${e.median?yenT(e.median):'—'}・${e.perVolCap?`単巻上限 ${yenT(e.perVolCap)}`:''}${e.perVolCap&&e.setCap?'・':''}${e.setCap?`セット上限 ${yenT(e.setCap)}`:''}${!e.perVolCap&&!e.setCap?'上限なし':''}${bk?`・所持：${o.length?esc(compactVols(o)):'なし'}`:''}</div>
+    ${e.memo?`<div class="s">${esc(e.memo)}</div>`:''}</div><div class="hd ${d!==null&&d>fresh?'old':''}">${e.checked?`確認 ${esc(e.checked.slice(5))}${d!==null&&d>fresh?'<br>古い':''}`:'確認日なし'}</div></div>`};
+  const pubGroups=(arr,sub)=>{const groups={};arr.forEach(([e,i])=>{const k=e.publisher||'（出版社なし）';(groups[k]=groups[k]||[]).push([e,i])});
+    return Object.keys(groups).sort().map(g=>`<div class="${sub?'hsub':'sec'}">${esc(g)}（${groups[g].length}）</div><div class="card">${groups[g].map(row).join('')}</div>`).join('')};
+  const body=!multi?pubGroups(hit,false):cats.map(c=>`<div class="sec">${esc(c)}（${byCat[c].length}）</div>${c===BOOK?pubGroups(byCat[c],true):`<div class="card">${byCat[c].map(row).join('')}</div>`}`).join('');
+  return `<div class="srch"><input id="hq" type="search" placeholder="作品名・出版社・カテゴリで絞り込み" value="${esc(UI.hq||'')}"></div>
+  <div class="note mb2">📋 探し物リスト ${hit.length}${q?` / ${L.length}`:''}件　所持巻は本・コミックの在庫（仕入済・出品中）から自動で計算しています。</div>
+  ${body||'<div class="empty">該当する作品はありません。</div>'}`}
 function huntHTML(){const L=S.hunt||[];if(!L.length)return `<details class="card hunt-acc"><summary>📋 探し物リスト（未登録）</summary><div class="note mt2">設定タブの「探し物リストを取り込む」で読み込むと、ここに出版社ごとに表示されます。</div></details>`;
   const groups={};L.forEach((e,i)=>{const k=e.publisher||'（出版社なし）';(groups[k]=groups[k]||[]).push([e,i])});
   const fresh=num(S.settings.fresh)||30;
@@ -617,7 +641,7 @@ function huntHTML(){const L=S.hunt||[];if(!L.length)return `<details class="card
 function renderHunt(){const e=$('#huntBox');if(e)e.innerHTML=huntHTML()}
 function huntDetail(e){const inv=huntInv(e);const o=[...ownedVols(e)].sort((x,y)=>x-y);
   openSheet(e.title,`<div class="card"><table>
-  <tr><td>作品名（照合用）</td><td class="wrap">${esc(e.work||'—')}</td></tr><tr><td>出版社</td><td>${esc(e.publisher||'—')}</td></tr><tr><td>巻</td><td>${esc(e.vols||'—')}</td></tr>
+  <tr><td>カテゴリ</td><td>${esc(catOf(e))}</td></tr><tr><td>作品名（照合用）</td><td class="wrap">${esc(e.work||'—')}</td></tr><tr><td>出版社</td><td>${esc(e.publisher||'—')}</td></tr><tr><td>巻</td><td>${esc(e.vols||'—')}</td></tr>
   <tr><td>中央値</td><td class="num">${e.median?yenT(e.median):'—'}</td></tr><tr><td>単巻上限</td><td class="num">${e.perVolCap?yenT(e.perVolCap):'—'}</td></tr><tr><td>セット上限</td><td class="num">${e.setCap?yenT(e.setCap):'—'}</td></tr>
   <tr><td>確認日</td><td>${esc(e.checked||'—')}${e.provisional?'（要再調査）':''}</td></tr><tr><td>所持（在庫から自動）</td><td>${o.length?esc(compactVols(o)):'なし'}</td></tr></table>
   ${e.memo?`<div class="note mt2">${esc(e.memo)}</div>`:''}</div>
@@ -888,7 +912,7 @@ function regOpen(){REG={log:[],pend:null};const s=S.settings;
   <div class="sec">この画面で登録した本</div><div id="regLog" class="note">まだありません</div>`)}
 function regParams(){const p=num($('#rgP').value);if(!isFinite(p)){toast('先に仕入価格（単価）を入れてください');return null}return{p,d:$('#rgD').value||today(),st:($('#rgS').value||'').trim()}}
 function regDup(code,title){const c=normCode(code),k=workKey(title),v=volOf(title);
-  return S.items.filter(it=>(it.st==='stock'||it.st==='listed')&&((c&&normCode(it.code)===c)||(v&&keyMatch(k,itemKey(it))&&itemVols(it).has(v))))}
+  return S.items.filter(it=>(it.st==='stock'||it.st==='listed')&&isBook(it)&&((c&&normCode(it.code)===c)||(v&&keyMatch(k,itemKey(it))&&itemVols(it).has(v))))}
 function regAdd(o){const P=regParams();if(!P)return false;const it=newItem({name:o.title||o.code,code:o.code||'',author:o.author||'',pub:o.pub||'',cover:o.cover||'',st:'stock',cost:P.p,date:P.d,store:P.st});
   S.items.unshift(it);save();REG.log.unshift(it.name);const l=$('#regLog');if(l)l.innerHTML=REG.log.map(n=>`✓ ${esc(n)}`).join('<br>');toast(`登録：${it.name}`);return true}
 function regPendShow(){const e=$('#regPend');if(!e)return;const P=REG&&REG.pend;if(!P){e.innerHTML='';return}
@@ -954,6 +978,11 @@ function listBundleDoAct(b){
 }
 /* ---------- 一覧 ---------- */
 function thumb(it){return ''}
+function soldParts(it){
+  const sp=num(it.soldPrice??it.sp);if(!(sp>0))return null;let c=chKey(it.soldCh);if(c==='o')c=S.settings.main;const cs=S.settings.ch[c];
+  const fee=isFinite(num(it.soldFee))?num(it.soldFee):Math.round(sp*num(cs.fee)/100);
+  const ship=fnum(it,'soldShip',fnum(it,'ship',num(cs.ship)||0)),pack=fnum(it,'soldPack',fnum(it,'pack',num(S.settings.pack)||0)),other=fnum(it,'soldOther',fnum(it,'other',num(S.settings.other)||0));
+  const cost=num(it.cost)||0;return{sp,fee,ship,pack,other,cost,total:cost+ship+fee+pack+other,profit:sp-fee-ship-pack-other-cost}}
 function soldProfit(it){
   const sp=num(it.soldPrice??it.sp);if(!(sp>0))return NaN;let c=chKey(it.soldCh);if(c==='o')c=S.settings.main;const cs=S.settings.ch[c];
   const fee=isFinite(num(it.soldFee))?num(it.soldFee):Math.round(sp*num(cs.fee)/100);
@@ -980,20 +1009,21 @@ function listHTML(){
   if(UI.listStore)arr=arr.filter(it=>(it.store||'')===UI.listStore);
   if(UI.listK)arr=arr.filter(it=>(it.setk||'')===UI.listK);
   if(UI.listM)arr=arr.filter(it=>String(it.date||'').slice(0,7)===UI.listM);
+  if(UI.listCat)arr=arr.filter(it=>catOf(it)===UI.listCat);
   const cnt=k=>k==='all'?S.items.length:S.items.filter(i=>i.st===k).length;
   const memCnt={};for(const i of S.items)if(i.inSet)memCnt[i.inSet]=(memCnt[i.inSet]||0)+1;
   const selN=Object.keys(UI.listSel).filter(k=>UI.listSel[k]).length;
   const shown=arr.slice(0,UI.listN);
   return `<div class="srch"><input id="lq" type="search" placeholder="タイトル・ISBN・タグ・店舗で絞り込み" value="${esc(UI.listQ)}"><button class="btn ${UI.listSelMode?'pri':''}" data-act="listSelMode">${UI.listSelMode?'選択中':'選択'}</button><button class="btn" data-act="regOpen">📷 読み取りで追加</button><button class="btn pri" data-act="newItem">＋新規</button></div>
-  <div class="fchips">${[['all','全部'],['cand','候補'],['stock','仕入済'],['listed','出品中'],['sold','売却済'],['re','再調査']].map(([k,l])=>`<button class="${f===k?'on':''}" data-act="listF" data-v="${k}">${l}${k!=='re'?' '+cnt(k):''}</button>`).join('')}</div>
-  ${(()=>{const af=[['ジャンル',UI.listG,'listG'],['出版社',UI.listP,'listP'],['状態',UI.listC,'listC'],['仕入店舗',UI.listStore,'listStore'],['区分',UI.listK,'listK'],['仕入月',UI.listM,'listM']].filter(x=>x[1]);return `<div class="selfrow"><button class="btn sm" data-act="listFilterOpen">絞り込み${af.length?`（${af.length}）`:''}</button>${af.map(([lb,v,k])=>`<span class="chip">${lb}：${esc(v)} <a href="#" data-act="listFilterClear" data-k="${k}">✕</a></span>`).join('')}</div>`})()}
+  <div class="fchips">${[['all','全部'],['cand','候補'],['stock','仕入済'],['listed','出品中'],['deal','取引中'],['sold','売却済'],['re','再調査']].map(([k,l])=>`<button class="${f===k?'on':''}" data-act="listF" data-v="${k}">${l}${k!=='re'?' '+cnt(k):''}</button>`).join('')}</div>
+  ${(()=>{const af=[['カテゴリ',UI.listCat,'listCat'],['ジャンル',UI.listG,'listG'],['出版社',UI.listP,'listP'],['状態',UI.listC,'listC'],['仕入店舗',UI.listStore,'listStore'],['区分',UI.listK,'listK'],['仕入月',UI.listM,'listM']].filter(x=>x[1]);return `<div class="selfrow"><button class="btn sm" data-act="listFilterOpen">絞り込み${af.length?`（${af.length}）`:''}</button>${af.map(([lb,v,k])=>`<span class="chip">${lb}：${esc(v)} <a href="#" data-act="listFilterClear" data-k="${k}">✕</a></span>`).join('')}</div>`})()}
   ${f==='re'?'<div class="note mb2">最新の売り切れから'+esc(S.settings.fresh)+'日を超えた（または日付不明の）作品です。相場を取り直して取り込んでください。</div>':''}
   <div class="list">${shown.map(it=>{
     let right='';
     if(it.st==='sold'){const p=soldProfit(it);right=`<div class="note">確定利益</div><div class="num">${yenT(p)}</div>`}
     else{const {p,a}=expectProfit(it);right=`<div class="note">${isFinite(p)?'見込み利益':'仕入上限'}</div><div class="num">${isFinite(p)?yenT(p):yenT(a.best&&a.best.max)}</div>`}
     return `<div class="it stc-${it.st}" data-act="openItem" data-id="${esc(it.id)}">${UI.listSelMode?`<input type="checkbox" class="qchk" data-lsel2="${esc(it.id)}" ${UI.listSel[it.id]?'checked':''}>`:''}${thumb(it)}<div class="m"><div class="t">${esc(it.name||'(無題)')}</div>
-      <div class="s"><span class="st ${it.st}">${ST[it.st]||esc(it.st)}</span>${esc([it.pub,it.genre,it.cond,it.cost!==''&&it.cost!=null?'仕入'+yenT(num(it.cost)):'',it.store,memCnt[it.id]?'束ね'+memCnt[it.id]+'冊':''].filter(Boolean).join('・'))}</div></div><div class="r">${right}</div></div>`}).join('')||'<div class="empty">該当する商品はありません。</div>'}</div>
+      <div class="s"><span class="st ${it.st}">${ST[it.st]||esc(it.st)}</span>${esc([isBook(it)?'':catOf(it),it.pub,it.genre,it.cond,it.cost!==''&&it.cost!=null?'仕入'+yenT(num(it.cost)):'',it.store,memCnt[it.id]?'束ね'+memCnt[it.id]+'冊':''].filter(Boolean).join('・'))}</div></div><div class="r">${right}</div></div>`}).join('')||'<div class="empty">該当する商品はありません。</div>'}</div>
   ${arr.length>shown.length?`<button class="btn" style="width:100%" data-act="more">さらに表示（残り${arr.length-shown.length}件）</button>`:''}${UI.listSelMode&&selN>=1?`<div style="height:64px"></div><div class="selbar"><span class="grow">${selN}冊 選択中</span>${selN>=2?'<button class="btn pri sm" data-act="listBundle">セットとして束ねる</button>':''}<button class="btn sm" data-act="listSelClear">解除</button></div>`:''}`;
 }
 
@@ -1001,7 +1031,7 @@ function listHTML(){
 const FIELDS=[
   ['基本'],
   ['name','商品名','text'],['code','ISBN／JAN','tel'],['work','作品名（相場の共有単位。空欄なら商品名から自動）','text'],
-  ['author','著者','text'],['pub','出版社','sel'],['genre','ジャンル','sel'],['cond','状態','sel'],['st','ステータス','st'],['prints','発行部数','num'],
+  ['author','著者','text'],['pub','出版社','sel'],['cat','カテゴリ','sel'],['genre','ジャンル','sel'],['cond','状態','sel'],['st','ステータス','st'],['prints','発行部数','num'],
   ['セット・巻'],
   ['setk','区分','sel'],['vols','巻数','text'],['range','セットの巻範囲（例 1-20）','text'],['have','手元の巻（例 1-5,7-20）','text'],
   ['費用（空欄は既定値）'],
@@ -1019,7 +1049,8 @@ function listFilterSheet(){
   const vs=k=>[...new Set(S.items.map(i=>String(i[k]||'')).filter(Boolean))].sort();
   const months=[...new Set(S.items.map(i=>String(i.date||'').slice(0,7)).filter(x=>/^\d{4}-\d{2}$/.test(x)))].sort().reverse();
   const sel=(k,lb,vals,v)=>vals.length?`<div class="fld"><label>${lb}</label><select data-lsel="${k}"><option value="">すべて</option>${vals.map(x=>`<option${x===v?' selected':''}>${esc(x)}</option>`).join('')}</select></div>`:'';
-  const body=sel('genre','ジャンル',vs('genre'),UI.listG)+sel('pub','出版社',vs('pub'),UI.listP)+sel('cond','状態',vs('cond'),UI.listC)+sel('store','仕入店舗',vs('store'),UI.listStore)+sel('setk','区分',vs('setk'),UI.listK)+sel('month','仕入月',months,UI.listM);
+  const cats=[...new Set([...CATS.filter(c=>S.items.some(i=>catOf(i)===c)),...S.items.map(catOf)])];
+  const body=sel('cat','カテゴリ',cats,UI.listCat)+sel('genre','ジャンル',vs('genre'),UI.listG)+sel('pub','出版社',vs('pub'),UI.listP)+sel('cond','状態',vs('cond'),UI.listC)+sel('store','仕入店舗',vs('store'),UI.listStore)+sel('setk','区分',vs('setk'),UI.listK)+sel('month','仕入月',months,UI.listM);
   return (body||'<div class="note">絞り込める項目がまだありません（ジャンルや店舗などの値が入ると、ここに出ます）</div>')+`<div class="btns mt3"><button class="btn" data-act="listFilterClearAll">すべてクリア</button><button class="btn pri" data-act="closeSheet">閉じる</button></div>`}
 function openSheet(title,html){$('#shT').textContent=title;$('#shB').innerHTML=html;$('#sheet').hidden=false;$('#shB').scrollTop=0}
 function closeSheet(){if(Scan.on&&Scan.wrapSel==='#regCam')stopScan();$('#sheet').hidden=true;EDIT=null;REG=null}
@@ -1029,6 +1060,7 @@ function openItem(id,prefill){
   drawEditor();
 }
 function selOpts(k,cur){let base=[];
+  if(k==='cat'){const all=[...new Set([...CATS,...S.items.map(catOf)])];if(cur&&!all.includes(String(cur)))all.push(String(cur));return all}
   if(k==='setk')base=['単巻','全巻セット','途中セット','セット','画集・設定資料集','小説','文庫','その他'];
   else if(k==='genre')base=['漫画','少年漫画','少女漫画','青年漫画','小説','ライトノベル','画集・設定資料集','雑誌','実用書','その他'];
   else if(k==='cond')base=['目立った傷や汚れなし','やや傷や汚れあり','傷や汚れあり','状態が悪い','新品・未使用'];
@@ -1038,7 +1070,7 @@ function selOpts(k,cur){let base=[];
   const all=[...new Set([...base,...used])];
   if(cur&&!all.includes(String(cur)))all.push(String(cur));
   return ['',...all]}
-const HALF=new Set(['author','pub','genre','cond','st','setk','vols','range','have','cost','ship','pack','other','store','date','prints','pm','py','pr','pa','lo','hi','listPrice','listDate','soldPrice','soldDate','soldCh','soldFee']);
+const HALF=new Set(['author','pub','cat','genre','cond','st','setk','vols','range','have','cost','ship','pack','other','store','date','prints','pm','py','pr','pa','lo','hi','listPrice','listDate','soldPrice','soldDate','soldCh','soldFee']);
 function drawEditor(){
   const e=EDIT;let h='';let secOpen=false;const halfBuf=[];
   const flushHalf=()=>{while(halfBuf.length){h+=`<div class="grid2">${halfBuf.splice(0,2).join('')}</div>`}};
@@ -1096,20 +1128,21 @@ function inPer(d,per){const dt=pd(d);if(!dt)return per==='all';const n=new Date(
   if(per==='year')return dt.getFullYear()===n.getFullYear();return true}
 function statsHTML(){
   const per=UI.per;const sold=S.items.filter(i=>i.st==='sold'&&inPer(i.soldDate||i.date,per));
-  let sales=0,prof=0,cnt=0,days=[];const byS={},byG={},byP={},byM={};
+  let sales=0,prof=0,cnt=0,days=[];const byS={},byG={},byP={},byM={},byC={};
   for(const it of sold){const p=soldProfit(it);const sp=num(it.soldPrice??it.sp);if(!isFinite(p))continue;cnt++;sales+=sp;prof+=p;
     const d1=pd(it.date),d2=pd(it.soldDate);if(d1&&d2)days.push((d2-d1)/864e5);
-    for(const [m,k] of [[byS,it.store||'（店舗未入力）'],[byG,it.genre||'（ジャンル未入力）'],[byP,it.pub||'（出版社未入力）'],[byM,(it.date||'').slice(0,7)||'（日付なし）']]){m[k]=m[k]||{n:0,s:0,p:0};m[k].n++;m[k].s+=sp;m[k].p+=p}}
+    for(const [m,k] of [[byS,it.store||'（店舗未入力）'],[byG,it.genre||'（ジャンル未入力）'],[byP,it.pub||'（出版社未入力）'],[byM,(it.date||'').slice(0,7)||'（日付なし）'],[byC,catOf(it)]]){m[k]=m[k]||{n:0,s:0,p:0};m[k].n++;m[k].s+=sp;m[k].p+=p}}
   const stock=S.items.filter(i=>(i.st==='stock'||i.st==='listed')&&!i.inSet);const stockCost=stock.reduce((s,i)=>s+(num(i.cost)||0),0);
   const un=S.items.filter(i=>i.st==='listed'&&daysAgo(i.listDate||i.date)>num(S.settings.unsoldDays)).sort((a,b)=>daysAgo(b.listDate||b.date)-daysAgo(a.listDate||a.date));
   const re=recheckList();
   const tbl=(m)=>{const ks=Object.keys(m).sort((a,b)=>m[b].p-m[a].p);return ks.length?`<table class="fixt"><tr><th></th><th>件数</th><th>利益</th><th>利益率</th></tr>${ks.map(k=>`<tr><td class="wrap">${esc(k)}</td><td class="num">${m[k].n}</td><td class="num">${yenT(m[k].p)}</td><td class="num">${pct(m[k].p/m[k].s)}</td></tr>`).join('')}</table>`:'<div class="note">データなし</div>'};
-  return `<div class="fchips">${[['month','今月'],['last','先月'],['30','直近30日'],['year','今年'],['all','全期間']].map(([k,l])=>`<button class="${per===k?'on':''}" data-act="per" data-v="${k}">${l}</button>`).join('')}</div>
+  return `${pnlHTML()}<div class="sec">販売集計</div><div class="fchips">${[['month','今月'],['last','先月'],['30','直近30日'],['year','今年'],['all','全期間']].map(([k,l])=>`<button class="${per===k?'on':''}" data-act="per" data-v="${k}">${l}</button>`).join('')}</div>
   <div class="kpis"><div class="kpi"><label>利益合計</label><b>${yen(prof)}</b></div><div class="kpi"><label>売上</label><b>${yen(sales)}</b></div>
   <div class="kpi"><label>売却数／平均利益率</label><b class="num">${cnt}</b> 件・<span class="num">${pct(sales?prof/sales:NaN)}</span></div>
   <div class="kpi"><label>平均在庫日数</label><b class="num">${days.length?(days.reduce((a,b)=>a+b,0)/days.length).toFixed(1):'—'}</b> 日</div>
   <div class="kpi"><label>在庫（仕入済＋出品中）</label><b class="num">${stock.length}</b> 冊</div><div class="kpi"><label>在庫の仕入額</label><b>${yen(stockCost)}</b></div></div>
-  <div class="fchips">${[['all','全体'],['store','店舗別'],['genre','ジャンル別'],['pub','出版社別'],['month','月別']].map(([k,l])=>`<button class="${UI.statsAxis===k?'on':''}" data-act="statsAxis" data-v="${k}">${l}</button>`).join('')}</div>
+  <div class="fchips">${[['all','全体'],['cat','カテゴリ別'],['store','店舗別'],['genre','ジャンル別'],['pub','出版社別'],['month','月別']].map(([k,l])=>`<button class="${UI.statsAxis===k?'on':''}" data-act="statsAxis" data-v="${k}">${l}</button>`).join('')}</div>
+  ${UI.statsAxis==='cat'?`<div class="sec">カテゴリ別</div><div class="card">${tbl(byC)}</div>`:''}
   ${UI.statsAxis==='store'?`<div class="sec">店舗別</div><div class="card">${tbl(byS)}</div>`:''}
   ${UI.statsAxis==='genre'?`<div class="sec">ジャンル別</div><div class="card">${tbl(byG)}</div>`:''}
   ${UI.statsAxis==='pub'?`<div class="sec">出版社別</div><div class="card">${tbl(byP)}</div>`:''}
@@ -1119,6 +1152,73 @@ function statsHTML(){
   <div class="sec">再調査リスト（相場の鮮度低下）${re.length}件</div>
   <div class="list">${re.slice(0,50).map(({it,a})=>`<div class="it" data-act="openItem" data-id="${esc(it.id)}">${thumb(it)}<div class="m"><div class="t">${esc(it.name)}</div><div class="s">最新売り切れ ${a.st.latest?ymd(a.st.latest):'日付不明'}</div></div></div>`).join('')||'<div class="note">ありません</div>'}</div>`;
 }
+
+/* ---------- 収支・経費帳簿（v1.6.0） ---------- */
+const curYM=()=>today().slice(0,7);
+function ymAdd(ym,d){let [y,m]=ym.split('-').map(Number);m+=d;while(m<1){m+=12;y--}while(m>12){m-=12;y++}return y+'-'+String(m).padStart(2,'0')}
+const soldYM=it=>String(it.soldDate||it.date||'').slice(0,7);
+// 売上に数えるのは「売却済」だけ（取引中は含めない）
+function pnl(ym){
+  const sold=S.items.filter(i=>i.st==='sold'&&soldYM(i)===ym);let sales=0,cost=0,n=0;const c={cost:0,ship:0,fee:0,pack:0,other:0};const byCat={};
+  for(const it of sold){const x=soldParts(it);if(!x)continue;n++;sales+=x.sp;cost+=x.total;for(const k in c)c[k]+=x[k];
+    const k=catOf(it);byCat[k]=byCat[k]||{n:0,s:0,p:0};byCat[k].n++;byCat[k].s+=x.sp;byCat[k].p+=x.profit}
+  const ex=S.expenses.filter(e=>String(e.date||'').slice(0,7)===ym);const exT=ex.reduce((a,e)=>a+(num(e.amount)||0),0);const exBy={};
+  for(const e of ex){const k=e.cat||'その他';exBy[k]=(exBy[k]||0)+(num(e.amount)||0)}
+  return{ym,n,sales,cost,c,exT,exBy,ex,byCat,net:sales-cost-exT}}
+function pnlChart(ym){
+  const ms=[];for(let i=11;i>=0;i--)ms.push(pnl(ymAdd(ym,-i)));
+  const W=360,H=170,top=10,bot=22,l=4;const mx=Math.max(1,...ms.map(m=>Math.max(m.sales,m.net))),mn=Math.min(0,...ms.map(m=>m.net));
+  const sc=v=>top+(mx-v)/(mx-mn)*(H-top-bot);const z=sc(0);const cw=(W-l)/12;const bw=cw*0.34;
+  let g=`<line x1="0" x2="${W}" y1="${z}" y2="${z}" stroke="var(--line)"/>`;
+  ms.forEach((m,i)=>{const x=l+i*cw+cw*0.12;const ys=sc(m.sales),yn=sc(m.net);
+    g+=`<rect x="${x}" y="${Math.min(ys,z)}" width="${bw}" height="${Math.max(Math.abs(z-ys),m.sales?1:0)}" fill="var(--s)" rx="2"><title>${m.ym} 売上 ${yenT(m.sales)}</title></rect>`;
+    g+=`<rect x="${x+bw+1}" y="${Math.min(yn,z)}" width="${bw}" height="${Math.max(Math.abs(z-yn),m.net?1:0)}" fill="${m.net<0?'var(--x)':'var(--ss)'}" rx="2"><title>${m.ym} 純利益 ${yenT(m.net)}</title></rect>`;
+    g+=`<text x="${l+i*cw+cw/2}" y="${H-6}" text-anchor="middle" font-size="10" fill="${m.ym===ym?'var(--tx)':'var(--mut)'}" font-weight="${m.ym===ym?700:400}">${+m.ym.slice(5)}月</text>`});
+  return `<div class="chart"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="直近12ヶ月の売上と純利益">${g}</svg>
+  <div class="lg"><span><i style="background:var(--s)"></i>売上</span><span><i style="background:var(--ss)"></i>純利益</span><span>最大 ${yenT(mx)}</span></div></div>`}
+function pnlHTML(){
+  const ym=UI.pnlM||(UI.pnlM=curYM());const r=pnl(ym);const [y,m]=ym.split('-');
+  const neg=v=>v<0?' class="neg"':'';
+  const cats=Object.keys(r.byCat).sort((a,b)=>{const ia=CATS.indexOf(a),ib=CATS.indexOf(b);return (ia<0?99:ia)-(ib<0?99:ib)});
+  const exs=r.ex.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  return `<div class="sec">収支</div>
+  <div class="pnav"><button class="btn sm" data-act="pnlM" data-v="-1">‹ 前月</button><b>${y}年${+m}月</b>${ym!==curYM()?'<button class="btn sm" data-act="pnlM" data-v="0">当月</button>':''}<button class="btn sm" data-act="pnlM" data-v="1">翌月 ›</button></div>
+  <div class="card"><table class="pl">
+  <tr><td>売上（売却済 ${r.n}件）</td><td class="num">${yenT(r.sales)}</td></tr>
+  <tr><td>売上コスト</td><td class="num">−${yenT(r.cost)}</td></tr>
+  <tr class="sub"><td>原価</td><td class="num">${yenT(r.c.cost)}</td></tr><tr class="sub"><td>送料</td><td class="num">${yenT(r.c.ship)}</td></tr><tr class="sub"><td>手数料</td><td class="num">${yenT(r.c.fee)}</td></tr><tr class="sub"><td>梱包費</td><td class="num">${yenT(r.c.pack)}</td></tr>${r.c.other?`<tr class="sub"><td>その他費用</td><td class="num">${yenT(r.c.other)}</td></tr>`:''}
+  <tr><td>経費（${r.ex.length}件）</td><td class="num">−${yenT(r.exT)}</td></tr>
+  ${EXCATS.concat(Object.keys(r.exBy).filter(k=>!EXCATS.includes(k))).filter(k=>r.exBy[k]).map(k=>`<tr class="sub"><td>${esc(k)}</td><td class="num">${yenT(r.exBy[k])}</td></tr>`).join('')}
+  <tr class="tot"><td>純利益</td><td class="num"><span${neg(r.net)}>${yenT(r.net)}</span></td></tr></table>
+  <div class="note mt1">純利益 ＝ 売上 − 売上コスト − 経費。売上は「売却済」の商品だけを売却日の月で数えます（取引中は含みません）。</div></div>
+  ${cats.length?`<div class="hsub">カテゴリ別の内訳（売上・利益は経費を引く前）</div><div class="card"><table class="fixt"><tr><th></th><th>件数</th><th>売上</th><th>利益</th></tr>${cats.map(k=>`<tr><td class="wrap">${esc(k)}</td><td class="num">${r.byCat[k].n}</td><td class="num">${yenT(r.byCat[k].s)}</td><td class="num">${yenT(r.byCat[k].p)}</td></tr>`).join('')}</table></div>`:''}
+  <div class="hsub">経費（${y}年${+m}月）</div><div class="card">${exs.map(e=>`<div class="exrow" data-act="exOpen" data-id="${esc(e.id)}"><div class="grow"><div>${esc(e.cat||'その他')}${e.memo?`<span class="mut">・${esc(e.memo)}</span>`:''}</div><div class="note">${esc(e.date||'')}</div></div><div class="num">${yenT(num(e.amount))} ›</div></div>`).join('')||'<div class="note">この月の経費はまだありません</div>'}
+  <div class="btns mt2"><button class="btn pri" data-act="exOpen">＋ 経費を追加</button></div>
+  <div class="note mt1">商品として登録した本・品物の仕入額は「原価」として売上コストに自動で入ります。経費の「仕入高」には、商品として登録していない仕入だけを入れてください（二重計上を防ぐため）。</div></div>
+  <div class="hsub">直近12ヶ月の推移</div><div class="card">${pnlChart(ym)}</div>
+  <div class="btns mt2"><button class="btn" data-act="pnlCsv">📄 収支CSVを書き出す（${y}年）</button></div>`}
+function exSheet(id){const e=id?S.expenses.find(x=>x.id===id):null;if(id&&!e){toast('経費が見つかりません');return}
+  const ym=UI.pnlM||curYM();const d=e?e.date:(ym===curYM()?today():ym+'-01');const cats=[...EXCATS];if(e&&e.cat&&!cats.includes(e.cat))cats.push(e.cat);
+  openSheet(e?'経費を編集':'経費を追加',`<div class="grid2"><div class="fld"><label>日付</label><input id="exD" type="date" value="${esc(d)}"></div>
+  <div class="fld"><label>科目</label><select id="exC">${cats.map(c=>`<option${(e?e.cat:'')===c?' selected':''}>${esc(c)}</option>`).join('')}</select></div></div>
+  <div class="fld"><label>金額（円）</label><input id="exA" inputmode="numeric" value="${e?esc(e.amount):''}" placeholder="例：1100"></div>
+  <div class="fld"><label>メモ</label><input id="exMm" value="${e?esc(e.memo||''):''}" placeholder="例：OPP袋 100枚"></div>
+  <div class="btns mt3"><button class="btn pri" data-act="exSave" data-id="${e?esc(e.id):''}">保存</button>${e?`<button class="btn dng" data-act="exDel" data-id="${esc(e.id)}">削除</button>`:''}<button class="btn" data-act="closeSheet">やめる</button></div>`)}
+function exSave(id){const date=$('#exD').value,cat=$('#exC').value,amount=num($('#exA').value),memo=$('#exMm').value.trim();
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(date)){toast('日付を入力してください');return}if(!(amount>0)){toast('金額を入力してください');return}
+  if(id){const e=S.expenses.find(x=>x.id===id);if(e)Object.assign(e,{date,cat,amount:Math.round(amount),memo})}
+  else S.expenses.push({id:uid(),date,cat,amount:Math.round(amount),memo});
+  UI.pnlM=date.slice(0,7);save();closeSheet();render();toast('経費を保存しました')}
+const csvQ=v=>{const t=String(v??'');return /[",\r\n]/.test(t)?'"'+t.replace(/"/g,'""')+'"':t};
+function pnlCsv(){const y=(UI.pnlM||curYM()).slice(0,4);const rows=[];
+  for(const it of S.items){if(it.st!=='sold')continue;const d=String(it.soldDate||it.date||'');if(d.slice(0,4)!==y)continue;const x=soldParts(it);if(!x)continue;rows.push([d.slice(0,10),'売上','売上高',x.sp,it.name||''])}
+  for(const e of S.expenses){const d=String(e.date||'');if(d.slice(0,4)!==y)continue;rows.push([d,'経費',e.cat||'その他',num(e.amount)||0,e.memo||''])}
+  if(!rows.length){toast(y+'年の売上・経費はまだありません');return}
+  rows.sort((a,b)=>a[0].localeCompare(b[0])||(a[1]==='売上'?-1:1));
+  const txt='﻿'+[['日付','区分','科目','金額','メモ'],...rows].map(r=>r.map(csvQ).join(',')).join('\r\n')+'\r\n';
+  const blob=new Blob([txt],{type:'text/csv'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`sss_shushi_${y}.csv`;
+  document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1500);
+  toast(`${y}年の収支CSVを書き出しました（${rows.length}行）`)}
 
 /* ---------- 設定 ---------- */
 function setHTML(){
@@ -1430,7 +1530,7 @@ const ACT={
   listBundleDo(b){listBundleDoAct(b)},
   listFilterOpen(){openSheet('絞り込み',listFilterSheet())},
   listFilterClear(b){UI[b.dataset.k]='';render()},
-  listFilterClearAll(){UI.listG='';UI.listP='';UI.listC='';UI.listStore='';UI.listK='';UI.listM='';closeSheet();render()},
+  listFilterClearAll(){UI.listCat='';UI.listG='';UI.listP='';UI.listC='';UI.listStore='';UI.listK='';UI.listM='';closeSheet();render()},
   listSelMode(){UI.listSelMode=!UI.listSelMode;if(!UI.listSelMode)UI.listSel={};render()},
   listSelClear(){UI.listSel={};render()},
   openMember(b){const sv=saveEditor();if(sv)openItem(b.dataset.id)},
@@ -1449,6 +1549,11 @@ const ACT={
   delItem(){if(!EDIT||!confirm(`「${EDIT.name}」を削除しますか？（相場${(EDIT.quotes||[]).length}件も消えます）`))return;S.items=S.items.filter(x=>String(x.id)!==String(EDIT.id));save();closeSheet();toast('削除しました');render()},
   statsAxis(b){UI.statsAxis=b.dataset.v;render()},
   per(b){UI.per=b.dataset.v;render()},
+  pnlM(b){const d=+b.dataset.v;UI.pnlM=d===0?curYM():ymAdd(UI.pnlM||curYM(),d);render()},
+  exOpen(b){exSheet(b.dataset.id||null)},
+  exSave(b){exSave(b.dataset.id||null)},
+  exDel(b){const e=S.expenses.find(x=>x.id===b.dataset.id);if(!e||!confirm(`この経費（${e.cat}・${yenT(num(e.amount))}）を削除しますか？`))return;S.expenses=S.expenses.filter(x=>x!==e);save();closeSheet();render();toast('経費を削除しました')},
+  pnlCsv(){pnlCsv()},
   postaItem(){const base=String(S.settings.postaUrl||'').trim();if(!base){toast('設定でPOSTAのURLを入力してください');return}
     const e=saveEditor();if(!e)return;
     const price=(e.listPrice!==''&&e.listPrice!=null)?e.listPrice:e.pm;
@@ -1503,7 +1608,7 @@ document.addEventListener('change',e=>{
     o[k]=v;save();if(UI.tab!=='look')render();else renderResult();return}
   if(el.id==='huntF'&&el.files&&el.files[0]){const f=el.files[0];el.value='';f.text().then(t=>{try{const r=huntImport(t);toast(`探し物リスト：追加${r.add}件・更新${r.upd}件（全${r.total}件）${r.bad?`・読めない行${r.bad}件`:''}`);render()}catch(err){toast(err.message||'読み込めません')}});return}
   if(el.dataset.lsel2!==undefined){UI.listSel[el.dataset.lsel2]=el.checked;render();return}
-  if(el.dataset.lsel!==undefined){const v=el.value;const mp={genre:'listG',pub:'listP',cond:'listC',store:'listStore',setk:'listK',month:'listM'};const uk=mp[el.dataset.lsel];if(uk){UI[uk]=v;UI.listN=150;render()}return}
+  if(el.dataset.lsel!==undefined){const v=el.value;const mp={cat:'listCat',genre:'listG',pub:'listP',cond:'listC',store:'listStore',setk:'listK',month:'listM'};const uk=mp[el.dataset.lsel];if(uk){UI[uk]=v;UI.listN=150;render()}return}
   if(el.dataset.qsel!==undefined){UI.cartSel[el.dataset.qsel]=el.checked;render();return}
   if(el.dataset.qprice){const q=S.queue.find(x=>x.id===el.dataset.qprice);if(q){const n=num(el.value);q.price=isFinite(n)?n:'';save();render()}return}
   if(el.dataset.link!==undefined){const l=S.links[+el.dataset.link];if(l){l[el.dataset.k]=el.value;save()}return}
