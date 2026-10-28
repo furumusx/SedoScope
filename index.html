@@ -192,7 +192,9 @@ table.fixt{table-layout:fixed}
 .hrow .hm{font-size:12px;color:var(--mut);margin-top:3px;overflow-wrap:anywhere}
 .hrow .ho{display:inline-block;font-size:11px;color:var(--s);border:1px solid var(--line);border-radius:999px;padding:0 8px;margin-top:4px}
 .hcats{margin-bottom:var(--sp2)}
-.hgens{margin-top:calc(-1 * var(--sp1));margin-bottom:var(--sp2)}
+.hgens,.hpubs{margin-top:calc(-1 * var(--sp1));margin-bottom:var(--sp2)}
+.hsub.pfold{display:flex;align-items:center;gap:var(--sp2);cursor:pointer;user-select:none;-webkit-user-select:none;padding:var(--sp2) var(--sp1);margin-top:var(--sp2);margin-bottom:0;border-bottom:1px solid var(--line)}
+.hsub.pfold:active{opacity:.6}.hsub.pfold+.card{margin-top:var(--sp2)}.hsub .gfi{color:var(--acc);font-size:14px;flex:none}
 .sec.gfold{display:flex;align-items:center;gap:var(--sp2);cursor:pointer;user-select:none;-webkit-user-select:none;background:var(--card2);border:1px solid var(--line);border-radius:var(--r-md);padding:var(--sp2) var(--sp3);margin-left:0;margin-right:0;color:var(--tx)}
 .sec.gfold:active{opacity:.7}.sec.gfold .gfi{color:var(--acc);font-size:14px;flex:none}
 .hinfo{display:flex;align-items:center;gap:var(--sp2);font-size:12px;color:var(--mut);margin:0 var(--sp1) var(--sp1);flex-wrap:wrap}
@@ -258,9 +260,10 @@ input[type="date"]{min-width:0;max-width:100%}
    データ: localStorage "sedoscope_s_v1"（SedoScope本体 "sedoscope_v1" とは別）
    外部通信: openBD ISBN照会のみ
    ============================================================ */
-const APP_VER='1.7.5';
+const APP_VER='1.7.6';
 const APP_DATE='2026-10-24';
 const CHANGELOG=[
+  'v1.7.6（2026-10-29）調べる（探し物リスト）に出版社の絞り込みボタンと、出版社見出しの折りたたみ（開閉状態は保存）を追加。ジャンルの無い探し物は「漫画」としてまとめ、ジャンルの絞り込みにも「漫画」を追加。',
   'v1.7.5（2026-10-28）探し物リストにジャンル（genre）を追加：調べるタブにジャンルの絞り込みボタンと、ジャンルごとの折りたたみ見出し（開閉状態は保存）。ジャンルの無い従来リストは見た目そのまま。',
   'v1.7.4（2026-10-27）商品編集を整理：想定売価の手入力を廃止（相場からの自動推定のみ）、出品・売却を「出品価格・出品日／売却価格・売却日／売却販路」に、実際の手数料の欄を外した（入力済みの過去の値は計算に使い続ける）。2列の入力枠（特に日付）が枠からはみ出す問題を修正。',
   'v1.7.3（2026-10-27）定型文はPOSTAに一本化し、SSSから定型文の画面（設定の管理・出品メモでの挿入/コピー）とPOSTA取り込み時の定型文の取り込みを外した（保存データ内の定型文はそのまま残し、使わない）。',
@@ -312,7 +315,7 @@ function defSettings(){return{
       r:{name:'ラクマ',fee:10,ship:210,on:true},a:{name:'ヤフオク',fee:10,ship:210,on:true}},
   pack:30,other:0,main:'m',pick:'main',
   acc:{obi:10,cover:30,booklet:10,poster:5,other:0},
-  store:'',stores:[],budget:'',autoQueue:false,postaUrl:'https://furumusx.github.io/posta/',komaUrl:'https://furumusx.github.io/KOMA/',huntCat:'',huntGenre:'',
+  store:'',stores:[],budget:'',autoQueue:false,postaUrl:'https://furumusx.github.io/posta/',komaUrl:'https://furumusx.github.io/KOMA/',huntCat:'',huntPub:'',huntGenre:'',
 }}
 function defState(){return{schema:1,items:[],hunt:[],expenses:[],queue:[],biblio:{},settings:defSettings(),links:DEF_LINKS.map(x=>({...x})),
   meta:{created:new Date().toISOString(),lastBackup:null,imports:[]}}}
@@ -657,11 +660,17 @@ function huntPage(){const L=S.hunt||[];
   const allCats=[...new Set(L.map(catOf))].sort((a,b)=>{const ia=CATS.indexOf(a),ib=CATS.indexOf(b);return (ia<0?99:ia)-(ib<0?99:ib)||a.localeCompare(b)});
   let hc=S.settings.huntCat||'';if(hc&&!allCats.includes(hc))hc='';
   const allGenres=[];for(const e of L){const g=genreOf(e);if(g&&!allGenres.includes(g))allGenres.push(g)}   // 初出順
-  const hasGenre=allGenres.length>0;let hg=S.settings.huntGenre||'';if(hg&&!allGenres.includes(hg))hg='';
+  const NONE='__none__',MANGA='漫画';const nNone=L.filter(e=>!genreOf(e)).length;   // v1.7.6：ジャンルなし＝「漫画」（選択値は番兵 __none__）
+  const hasGenre=allGenres.length>0;let hg=S.settings.huntGenre||'';if(hg&&!(allGenres.includes(hg)||(hg===NONE&&nNone)))hg='';
+  if(S.settings.huntFold&&S.settings.huntFold['ジャンルなし']){const f=Object.assign({},S.settings.huntFold);delete f['ジャンルなし'];f[MANGA]=1;S.settings.huntFold=f;save()}   // 旧ラベルの折りたたみを引き継ぐ（一度きり）
   const fold=S.settings.huntFold||{};
+  const genreHit=e=>!hg||(hg===NONE?!genreOf(e):genreOf(e)===hg);
+  const pubOf=e=>String(e.publisher||'').trim()||'（出版社なし）';   // v1.7.6：出版社キー（見出しと同じ）
+  const allPubs=[...new Set(L.map(pubOf))].sort();const hasPubChips=allPubs.length>=2;
+  let hp=S.settings.huntPub||'';if(hp&&!allPubs.includes(hp))hp='';const pfold=S.settings.huntPubFold||{};
   const q=String(UI.hq||'').normalize('NFKC').toLowerCase();
-  const hit=L.map((e,i)=>[e,i]).filter(([e])=>(!hc||catOf(e)===hc)&&(!hg||genreOf(e)===hg)&&(!q||[e.title,e.work,e.publisher,catOf(e),genreOf(e),e.memo].join(' ').normalize('NFKC').toLowerCase().includes(q)));
-  const inCat=L.filter(e=>(!hc||catOf(e)===hc)&&(!hg||genreOf(e)===hg)).length;
+  const hit=L.map((e,i)=>[e,i]).filter(([e])=>(!hc||catOf(e)===hc)&&(!hp||pubOf(e)===hp)&&genreHit(e)&&(!q||[e.title,e.work,e.publisher,catOf(e),genreOf(e),e.memo].join(' ').normalize('NFKC').toLowerCase().includes(q)));
+  const inCat=L.filter(e=>(!hc||catOf(e)===hc)&&(!hp||pubOf(e)===hp)&&genreHit(e)).length;
   const fresh=num(S.settings.fresh)||30;
   const volTxt=e=>{const v=String(e.vols??'').trim();if(!v)return '';return /巻/.test(v)?v:v+'巻'};
   const row=([e,i])=>{const bk=isBook(e);const o=bk?[...ownedVols(e)].sort((x,y)=>x-y):[];const d=e.checked?daysAgo(e.checked):null;const old=d!==null&&d>fresh;
@@ -673,20 +682,24 @@ function huntPage(){const L=S.hunt||[];
       ${e.memo?`<div class="hm">${esc(e.memo)}</div>`:''}
       ${bk&&o.length?`<div class="ho">📦 所持 ${esc(compactVols(o))}</div>`:''}</div>
       <div class="hd ${old?'old':''}">${e.checked?`${esc(e.checked.slice(5).replace('-','/'))}${old?'<br>古い':''}`:'確認日<br>なし'}</div></div>`};
-  const pubGroups=arr=>{const groups={};arr.forEach(([e,i])=>{const k=e.publisher||'（出版社なし）';(groups[k]=groups[k]||[]).push([e,i])});
-    return Object.keys(groups).sort().map(g=>`<div class="hsub">${esc(g)}（${groups[g].length}）</div><div class="card hcard">${groups[g].map(row).join('')}</div>`).join('')};
+  const pubGroups=arr=>{const groups={};arr.forEach(([e,i])=>{const k=pubOf(e);(groups[k]=groups[k]||[]).push([e,i])});
+    return Object.keys(groups).sort().map(g=>{const shut=!hp&&!!pfold[g];
+      const head=hp?`<div class="hsub">${esc(g)}（${groups[g].length}）</div>`   // 出版社で絞り込み中：見出し固定・常に開く
+        :`<div class="hsub pfold" data-act="huntPubFold" data-v="${esc(g)}" role="button" aria-expanded="${shut?'false':'true'}"><span class="grow">${esc(g)}（${groups[g].length}）</span><span class="gfi">${shut?'▸':'▾'}</span></div>`;
+      return head+(shut?'':`<div class="card hcard">${groups[g].map(row).join('')}</div>`)}).join('')};
   // カテゴリ→（本は出版社）の描画。catHead：カテゴリ見出しを出すか
   const catBody=(arr,catHead)=>{const byCat={};arr.forEach(x=>{const c=catOf(x[0]);(byCat[c]=byCat[c]||[]).push(x)});
     return allCats.filter(c=>byCat[c]).map(c=>`${catHead?`<div class="sec">${esc(c)}（${byCat[c].length}）</div>`:''}${c===BOOK?pubGroups(byCat[c]):`<div class="card hcard">${byCat[c].map(row).join('')}</div>`}`).join('')};
   let body;
   if(!hasGenre)body=catBody(hit,!hc&&allCats.length>1);   // 従来リストだけ：見た目は今まで通り
   else if(hg)body=catBody(hit,!hc&&new Set(hit.map(x=>catOf(x[0]))).size>1);   // ジャンル絞り込み中：見出しなしで開いて表示
-  else{const NG='ジャンルなし';const order=[...allGenres,NG];const byG={};hit.forEach(x=>{const g=genreOf(x[0])||NG;(byG[g]=byG[g]||[]).push(x)});
+  else{const NG=MANGA;const order=[...allGenres.filter(g=>g!==NG),NG];const byG={};hit.forEach(x=>{const g=genreOf(x[0])||NG;(byG[g]=byG[g]||[]).push(x)});
     body=order.filter(g=>byG[g]).map(g=>{const arr=byG[g],shut=!!fold[g];
       return `<div class="sec gfold" data-act="huntFold" data-v="${esc(g)}" role="button" aria-expanded="${shut?'false':'true'}"><span class="grow">${esc(g)}（${arr.length}）</span><span class="gfi">${shut?'▸':'▾'}</span></div>${shut?'':`<div class="gbody">${catBody(arr,!hc&&new Set(arr.map(x=>catOf(x[0]))).size>1)}</div>`}`}).join('')}
   return `<div class="srch"><input id="hq" type="search" placeholder="作品名・出版社・メモで絞り込み" value="${esc(UI.hq||'')}"></div>
   ${allCats.length>1?`<div class="fchips hcats">${[['','すべて',L.length],...allCats.map(c=>[c,c,L.filter(e=>catOf(e)===c).length])].map(([k,l,n])=>`<button class="${hc===k?'on':''}" data-act="huntCat" data-v="${esc(k)}">${esc(l)} ${n}</button>`).join('')}</div>`:''}
-  ${hasGenre?`<div class="fchips hgens">${[['','すべて',L.length],...allGenres.map(g=>[g,g,L.filter(e=>genreOf(e)===g).length])].map(([k,l,n])=>`<button class="${hg===k?'on':''}" data-act="huntGenre" data-v="${esc(k)}">${esc(l)} ${n}</button>`).join('')}</div>`:''}
+  ${hasPubChips?`<div class="fchips hpubs">${[['','すべて',L.length],...allPubs.map(g=>[g,g,L.filter(e=>pubOf(e)===g).length])].map(([k,l,n])=>`<button class="${hp===k?'on':''}" data-act="huntPub" data-v="${esc(k)}">${esc(l)} ${n}</button>`).join('')}</div>`:''}
+  ${hasGenre?`<div class="fchips hgens">${[['','すべて',L.length],...allGenres.map(g=>[g,g,L.filter(e=>genreOf(e)===g).length]),...(nNone?[[NONE,MANGA,nNone]]:[])].map(([k,l,n])=>`<button class="${hg===k?'on':''}" data-act="huntGenre" data-v="${esc(k)}">${esc(l)} ${n}</button>`).join('')}</div>`:''}
   <div class="hinfo">📋 <span id="hCnt">${hit.length}${q?` / ${inCat}`:''}</span>件<details class="hx"><summary>所持巻について</summary><div class="note">所持巻は、本・コミックの在庫（仕入済・出品中）から自動で計算しています。取引中・売却済は数えません。</div></details></div>
   <div id="huntRes">${body||'<div class="empty">該当する作品はありません。</div>'}</div>`}
 function huntHTML(){const L=S.hunt||[];if(!L.length)return `<details class="card hunt-acc"><summary>📋 探し物リスト（未登録）</summary><div class="note mt2">設定タブの「探し物リストを取り込む」で読み込むと、ここに出版社ごとに表示されます。</div></details>`;
@@ -700,7 +713,7 @@ function huntHTML(){const L=S.hunt||[];if(!L.length)return `<details class="card
 function renderHunt(){const e=$('#huntBox');if(e)e.innerHTML=huntHTML()}
 function huntDetail(e){const inv=huntInv(e);const o=[...ownedVols(e)].sort((x,y)=>x-y);
   openSheet(e.title,`<div class="card"><table>
-  <tr><td>カテゴリ</td><td>${esc(catOf(e))}</td></tr><tr><td>ジャンル</td><td class="wrap">${esc(genreOf(e)||'—')}</td></tr><tr><td>作品名（照合用）</td><td class="wrap">${esc(e.work||'—')}</td></tr><tr><td>出版社</td><td>${esc(e.publisher||'—')}</td></tr><tr><td>巻</td><td>${esc(e.vols||'—')}</td></tr>
+  <tr><td>カテゴリ</td><td>${esc(catOf(e))}</td></tr><tr><td>ジャンル</td><td class="wrap">${esc(genreOf(e)||'漫画')}</td></tr><tr><td>作品名（照合用）</td><td class="wrap">${esc(e.work||'—')}</td></tr><tr><td>出版社</td><td>${esc(e.publisher||'—')}</td></tr><tr><td>巻</td><td>${esc(e.vols||'—')}</td></tr>
   <tr><td>中央値</td><td class="num">${e.median?yenT(e.median):'—'}</td></tr><tr><td>単巻上限</td><td class="num">${e.perVolCap?yenT(e.perVolCap):'—'}</td></tr><tr><td>セット上限</td><td class="num">${e.setCap?yenT(e.setCap):'—'}</td></tr>
   <tr><td>確認日</td><td>${esc(e.checked||'—')}${e.provisional?'（要再調査）':''}</td></tr><tr><td>所持（在庫から自動）</td><td>${o.length?esc(compactVols(o)):'なし'}</td></tr></table>
   ${e.memo?`<div class="note mt2">${esc(e.memo)}</div>`:''}</div>
@@ -1768,6 +1781,8 @@ const ACT={
   saveItem(){if(saveEditor()){closeSheet();render()}},
   huntCat(b){S.settings.huntCat=b.dataset.v;save();render()},
   huntGenre(b){S.settings.huntGenre=b.dataset.v;save();render()},
+  huntPub(b){S.settings.huntPub=b.dataset.v;save();render()},
+  huntPubFold(b){const k=b.dataset.v;const f=Object.assign({},S.settings.huntPubFold||{});if(f[k])delete f[k];else f[k]=1;S.settings.huntPubFold=f;save();if(UI.tab==='look')partial(huntPage(),['huntRes','hCnt']);else render()},
   huntFold(b){const k=b.dataset.v;const f=Object.assign({},S.settings.huntFold||{});if(f[k])delete f[k];else f[k]=1;S.settings.huntFold=f;save();if(UI.tab==='look')partial(huntPage(),['huntRes','hCnt']);else render()},
   komaItem(){komaItem()},
   genApply(){readEditor();const g=EDIT.gen;if(!String(g.work||'').trim()){toast('作品名を入力してください');return}const t=genTitle(g),d=genBody(g);
