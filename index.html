@@ -260,9 +260,10 @@ input[type="date"]{min-width:0;max-width:100%}
    データ: localStorage "sedoscope_s_v1"（SedoScope本体 "sedoscope_v1" とは別）
    外部通信: openBD ISBN照会のみ
    ============================================================ */
-const APP_VER='1.7.6';
+const APP_VER='1.7.7';
 const APP_DATE='2026-10-24';
 const CHANGELOG=[
+  'v1.7.7（2026-11-01）設定タブに「探し物リストの更新を取り込む」ボタンを追加。サーバーに置いた更新ファイルをボタン1つで取り込めるように。',
   'v1.7.6（2026-10-29）調べる（探し物リスト）に出版社の絞り込みボタンと、出版社見出しの折りたたみ（開閉状態は保存）を追加。ジャンルの無い探し物は「漫画」としてまとめ、ジャンルの絞り込みにも「漫画」を追加。',
   'v1.7.5（2026-10-28）探し物リストにジャンル（genre）を追加：調べるタブにジャンルの絞り込みボタンと、ジャンルごとの折りたたみ見出し（開閉状態は保存）。ジャンルの無い従来リストは見た目そのまま。',
   'v1.7.4（2026-10-27）商品編集を整理：想定売価の手入力を廃止（相場からの自動推定のみ）、出品・売却を「出品価格・出品日／売却価格・売却日／売却販路」に、実際の手数料の欄を外した（入力済みの過去の値は計算に使い続ける）。2列の入力枠（特に日付）が枠からはみ出す問題を修正。',
@@ -315,7 +316,7 @@ function defSettings(){return{
       r:{name:'ラクマ',fee:10,ship:210,on:true},a:{name:'ヤフオク',fee:10,ship:210,on:true}},
   pack:30,other:0,main:'m',pick:'main',
   acc:{obi:10,cover:30,booklet:10,poster:5,other:0},
-  store:'',stores:[],budget:'',autoQueue:false,postaUrl:'https://furumusx.github.io/posta/',komaUrl:'https://furumusx.github.io/KOMA/',huntCat:'',huntPub:'',huntGenre:'',
+  store:'',stores:[],budget:'',autoQueue:false,postaUrl:'https://furumusx.github.io/posta/',komaUrl:'https://furumusx.github.io/KOMA/',huntCat:'',huntPub:'',huntGenre:'',huntUpdVer:0,
 }}
 function defState(){return{schema:1,items:[],hunt:[],expenses:[],queue:[],biblio:{},settings:defSettings(),links:DEF_LINKS.map(x=>({...x})),
   meta:{created:new Date().toISOString(),lastBackup:null,imports:[]}}}
@@ -1487,7 +1488,7 @@ function setHTML(){
   前回のバックアップ：<b>${S.meta.lastBackup?esc(String(S.meta.lastBackup).slice(0,16).replace('T',' ')):'なし'}</b><br>
   保存キー：<span class="num">${KEY}</span>（SedoScope本体のデータとは別）
   <div class="btns mt3"><button class="btn pri" data-act="doBackup">バックアップを書き出す</button><button class="btn" data-act="copyBackup">バックアップをコピー</button><button class="btn" data-act="restoreOpen">バックアップから復元</button></div>
-  <div class="btns mt2"><button class="btn" data-act="sedoOpen">SedoScopeのデータを取り込む</button><button class="btn" data-act="csvOpen">相場CSVを取り込む</button><label class="btn pick">探し物リストを取り込む<input type="file" id="huntF" accept=".json,application/json,text/plain"></label></div>
+  <div class="btns mt2"><button class="btn" data-act="sedoOpen">SedoScopeのデータを取り込む</button><button class="btn" data-act="csvOpen">相場CSVを取り込む</button><label class="btn pick">探し物リストを取り込む<input type="file" id="huntF" accept=".json,application/json,text/plain"></label><button class="btn" data-act="huntUpdate">探し物リストの更新を取り込む</button></div>
   <div class="btns mt2"><button class="btn dng" data-act="wipe">すべてのデータを初期化</button></div></div>
   <div class="note my3">SSS v${APP_VER}（${APP_DATE}）／外部通信は openBD（ISBNの書誌照会）のみ。</div>`;
 }
@@ -1826,6 +1827,13 @@ const ACT={
     const mode=$('#sdMode').value;if(mode==='replace'&&!confirm(`SSSの今のデータ（商品${S.items.length}件）を消して、SedoScopeのデータ（${src.items.length}件）に入れ替えます。よろしいですか？`))return;
     const sum=importSedo(src,mode,{applySet:$('#sdSet').checked});$('#sdSum').innerHTML=sedoSumHTML(sum);toast(`${sum.added}件を取り込みました`)},
   csvOpen(){csvOpen(null,'')},
+  async huntUpdate(){let txt,o;   // v1.7.7：同一オリジンの hunt_update.json を取り込む（huntImport を再利用）
+    try{const r=await fetch('hunt_update.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);txt=await r.text()}catch(e){toast('更新を取得できませんでした');return}
+    try{o=JSON.parse(txt)}catch(e){o=null}
+    const v=o&&o.version;if(typeof v!=='number'||!isFinite(v)){toast('更新ファイルの形式が違います');return}
+    if(v<=(S.settings.huntUpdVer||0)){toast('探し物リストは最新です');return}
+    let r;try{r=huntImport(txt)}catch(err){toast(err.message||'読み込めません');return}
+    S.settings.huntUpdVer=v;save();toast(`探し物リスト：追加${r.add}件・更新${r.upd}件（全${r.total}件）${r.bad?`・読めない行${r.bad}件`:''}`);render()},
   async csvRun(){const txt=await readFT('cv');if(!txt.trim()){toast('CSVを選ぶか貼り付けてください');return}
     let r;try{r=importCSV(txt,$('#cvTgt').value,$('#cvN').value,$('#cvS').value)}catch(e){toast(e.message);return}
     $('#cvSum').innerHTML=`<div class="card sum">取り込み先：<b class="ff">${esc(r.it.name)}</b>${r.created?'（新規作成）':''}<br>読み込んだ行 <b>${r.total}</b>／追加 <b>${r.add}</b>／重複除外 <b>${r.dup}</b>／読めない行 <b>${r.bad}</b></div>`;
