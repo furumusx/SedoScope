@@ -232,6 +232,7 @@ input[type="date"]{min-width:0;max-width:100%}
 .pl{width:100%;border-collapse:collapse}.pl td{padding:var(--sp1) 0;border-bottom:1px solid var(--line)}.pl td:last-child{text-align:right}
 .pl tr.sub td{color:var(--mut);font-size:var(--fs-sub);padding-left:var(--sp3)}.pl tr.tot td{font-weight:800;border-bottom:none;font-size:var(--fs-sec)}
 .pl .neg{color:var(--x)}
+.goal .row{flex-wrap:wrap}.goal .neg{color:var(--x)}.gbar{height:10px;border-radius:5px;background:var(--card2);border:1px solid var(--line);overflow:hidden;margin-top:var(--sp2)}.gbar i{display:block;height:100%;background:var(--ss);border-radius:5px}
 .exrow{display:flex;gap:var(--sp2);padding:var(--sp2) 0;border-bottom:1px solid var(--line);cursor:pointer}.exrow:last-child{border-bottom:none}
 .chart svg{width:100%;height:auto;display:block}.lg{display:flex;gap:var(--sp3);font-size:var(--fs-sub);color:var(--mut);margin-top:var(--sp1)}.lg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
 </style>
@@ -260,9 +261,10 @@ input[type="date"]{min-width:0;max-width:100%}
    データ: localStorage "sedoscope_s_v1"（SedoScope本体 "sedoscope_v1" とは別）
    外部通信: openBD ISBN照会のみ
    ============================================================ */
-const APP_VER='1.7.7';
+const APP_VER='1.7.8';
 const APP_DATE='2026-10-24';
 const CHANGELOG=[
+  'v1.7.8（2026-11-01）集計の「売れ残り・値下げ候補」に値下げボタンを追加（新しい出品価格と改定日を記録し、改定から7日を超えると再び候補に）。探し物リストの詳細から「セット上限で仕入れた」「この金額で仕入れた」で在庫に登録し、そのまま編集できるように。設定に月の純利益の目標を追加し、集計に達成率のカードと12ヶ月グラフの目標ラインを表示。',
   'v1.7.7（2026-11-01）設定タブに「探し物リストの更新を取り込む」ボタンを追加。サーバーに置いた更新ファイルをボタン1つで取り込めるように。',
   'v1.7.6（2026-10-29）調べる（探し物リスト）に出版社の絞り込みボタンと、出版社見出しの折りたたみ（開閉状態は保存）を追加。ジャンルの無い探し物は「漫画」としてまとめ、ジャンルの絞り込みにも「漫画」を追加。',
   'v1.7.5（2026-10-28）探し物リストにジャンル（genre）を追加：調べるタブにジャンルの絞り込みボタンと、ジャンルごとの折りたたみ見出し（開閉状態は保存）。ジャンルの無い従来リストは見た目そのまま。',
@@ -718,7 +720,19 @@ function huntDetail(e){const inv=huntInv(e);const o=[...ownedVols(e)].sort((x,y)
   <tr><td>中央値</td><td class="num">${e.median?yenT(e.median):'—'}</td></tr><tr><td>単巻上限</td><td class="num">${e.perVolCap?yenT(e.perVolCap):'—'}</td></tr><tr><td>セット上限</td><td class="num">${e.setCap?yenT(e.setCap):'—'}</td></tr>
   <tr><td>確認日</td><td>${esc(e.checked||'—')}${e.provisional?'（要再調査）':''}</td></tr><tr><td>所持（在庫から自動）</td><td>${o.length?esc(compactVols(o)):'なし'}</td></tr></table>
   ${e.memo?`<div class="note mt2">${esc(e.memo)}</div>`:''}</div>
-  <div class="sec">この作品の在庫（${inv.length}件）</div><div class="list">${inv.map(it=>`<div class="it" data-act="openItem" data-id="${esc(it.id)}"><div class="m"><div class="t">${esc(it.name)}</div><div class="s"><span class="st ${it.st}">${ST[it.st]}</span>${it.inSet?'束ねたセットの中':''}</div></div></div>`).join('')||'<div class="note">在庫はありません</div>'}</div>`)}
+  <div class="sec">この作品の在庫（${inv.length}件）</div><div class="list">${inv.map(it=>`<div class="it" data-act="openItem" data-id="${esc(it.id)}"><div class="m"><div class="t">${esc(it.name)}</div><div class="s"><span class="st ${it.st}">${ST[it.st]}</span>${it.inSet?'束ねたセットの中':''}</div></div></div>`).join('')||'<div class="note">在庫はありません</div>'}</div>
+  <div class="sec">仕入れ登録</div><div class="card">
+  ${e.setCap?`<button class="btn pri" style="width:100%" data-act="huntBuy" data-t="${esc(e.title)}" data-cap="1">セット上限（¥${Math.round(e.setCap).toLocaleString('ja-JP')}）で仕入れた</button>`:''}
+  <div class="row${e.setCap?' mt2':''}"><input id="hbAmt" class="grow inline-in" style="width:auto" inputmode="numeric" placeholder="仕入れた金額（円）"><button class="btn sm" data-act="huntBuy" data-t="${esc(e.title)}">この金額で仕入れた</button></div>
+  <div id="hbErr" class="note" style="color:var(--x)"></div></div>`)}
+// v1.7.8：探し物詳細から仕入れ登録（在庫として追加→その商品の編集を開く）。対象は title で引く（huntOpenKey と同じ方式）
+function huntBuy(title,useSet){const e=S.hunt.find(x=>x.title===title);if(!e){toast('探し物が見つかりません');return}
+  const amt=useSet?num(e.setCap):num(($('#hbAmt')||{}).value);
+  if(!isFinite(amt)||Math.round(amt)<1){const m='仕入れた金額を1円以上で入力してください';const el=$('#hbErr');if(el)el.textContent=m;toast(m);return}
+  const o={name:e.title,st:'stock',cost:Math.round(amt),date:today(),cat:catOf(e)};
+  if(genreOf(e))o.genre=genreOf(e);if(String(e.publisher||'').trim())o.pub=String(e.publisher).trim();
+  const it=newItem(o);S.items.unshift(it);if(!save())return;
+  closeSheet();render();toast('在庫に登録しました');openItem(it.id)}
 function renderResult(){
   const el=$('#res');if(!el)return;
   if(!CUR){el.innerHTML=`<div class="empty">📷 スキャン、またはISBN／タイトルを入力して調べます。<br><span class="note">相場データ：登録済み ${S.items.length}商品／相場 ${S.items.reduce((s,i)=>s+(i.quotes||[]).length,0)}件</span></div>`;return}
@@ -1175,7 +1189,7 @@ function drawEditor(){
   <div class="grid2"><div class="fld"><label>状態</label><input id="nqD" placeholder="目立った傷なし 等"></div><div class="fld"><label>確認日</label><input id="nqT" type="date" value="${today()}"></div></div>
   <div class="btns"><button class="btn" data-act="addQuote">相場を追加</button><button class="btn" data-act="csvForEdit">相場CSVを取り込む</button></div>
   <div class="mt2">${qs.slice(0,80).map(q=>`<div class="qrow"><span>${q.status==='sold'?'売切':q.status==='listing'?'出品中':'不明'}・${esc(q.ch&&q.ch!=='o'?S.settings.ch[q.ch].name:q.src||'')}・${esc(q.cond||'')}<br><span class="mut">${esc(q.title||'')}</span></span><span class="num">${yenT(q.price)}<br><span class="mut">${esc(q.date||'')}</span></span></div>`).join('')}${qs.length>80?`<div class="note">ほか${qs.length-80}件</div>`:''}</div></div>`;
-  const extra=Object.keys(e).filter(k=>!FIELDS.some(f=>f[0]===k)&&!['id','quotes','acc','created','_isNew','cover','autoBundle','inSet','listTitle','listDesc','listPrice','gen','postaId','pm','py','pr','pa','lo','hi','soldFee','soldShip','soldPack','soldOther'].includes(k)&&!k.startsWith('_'));
+  const extra=Object.keys(e).filter(k=>!FIELDS.some(f=>f[0]===k)&&!['id','quotes','acc','created','_isNew','cover','autoBundle','inSet','listTitle','listDesc','listPrice','gen','postaId','pm','py','pr','pa','lo','hi','soldFee','soldShip','soldPack','soldOther','cutDate'].includes(k)&&!k.startsWith('_'));
   if(extra.length)h+=`<div class="note mt3">その他の保存項目（表示のみ・そのまま保持）：${esc(extra.join(', '))}</div>`;
   h+=`<div class="btns edfoot"><button class="btn pri" data-act="saveItem">保存</button>${e._isNew?'':`<button class="btn dng" data-act="delItem">削除</button>`}</div>`;
   openSheet(e._isNew?'新規商品':(e.name||'商品'),h);updGen();updLtCount();
@@ -1198,6 +1212,29 @@ function inPer(d,per){const dt=pd(d);if(!dt)return per==='all';const n=new Date(
   if(per==='month')return dt.getFullYear()===n.getFullYear()&&dt.getMonth()===n.getMonth();
   if(per==='last'){const l=new Date(n.getFullYear(),n.getMonth()-1,1);return dt.getFullYear()===l.getFullYear()&&dt.getMonth()===l.getMonth()}
   if(per==='year')return dt.getFullYear()===n.getFullYear();return true}
+// v1.7.8：値下げ候補。未改定は出品から unsoldDays 日超、改定済み（cutDate）は改定から CUT_DAYS 日超で再び候補
+const CUT_DAYS=7;
+function cutDue(it){if(it.st!=='listed')return false;
+  if(pd(it.cutDate))return daysAgo(it.cutDate)>CUT_DAYS;
+  return daysAgo(it.listDate||it.date)>num(S.settings.unsoldDays)}
+function cutSheet(id){const it=getItem(id);if(!it){toast('商品が見つかりません');return}
+  const cur=num(it.listPrice),cd=pd(it.cutDate);
+  openSheet('値下げ',`<div class="card"><table>
+  <tr><td>商品名</td><td class="wrap">${esc(it.name||'(無題)')}</td></tr>
+  <tr><td>現在の出品価格</td><td class="num">${yenT(cur)}</td></tr>
+  <tr><td>出品からの日数</td><td class="num">${daysAgo(it.listDate||it.date)??'—'}日</td></tr>
+  ${cd?`<tr><td>最終改定日</td><td>${esc(ymd(cd))}（改定${daysAgo(it.cutDate)}日前）</td></tr>`:''}</table></div>
+  <div class="fld"><label>新しい出品価格（円）</label><input id="cutP" inputmode="numeric" placeholder="${isFinite(cur)?esc(Math.round(cur)):''}"></div>
+  <div id="cutErr" class="note" style="color:var(--x)"></div>
+  <div class="btns mt3"><button class="btn pri" data-act="cutSave" data-id="${esc(it.id)}">値下げを記録する</button><button class="btn" data-act="closeSheet">やめる</button></div>`)}
+function cutSave(id){const it=getItem(id);if(!it){toast('商品が見つかりません');return}
+  const raw=String(($('#cutP')||{}).value||'').trim(),n=num(raw),cur=num(it.listPrice);
+  const err=m=>{const el=$('#cutErr');if(el)el.textContent=m;toast(m)};
+  const nv=Math.round(n);
+  if(raw===''||!isFinite(n)||nv<1){err('新しい出品価格を1円以上の数値で入力してください');return}
+  if(isFinite(cur)&&nv>=cur){err(`現在の出品価格（${yenT(cur)}）より低い金額を入力してください`);return}
+  it.listPrice=nv;it.cutDate=today();it.updated=new Date().toISOString();
+  if(!save())return;closeSheet();render();toast(`値下げを記録しました（${yenT(cur)} → ${yenT(nv)}）`)}
 function statsHTML(){
   const per=UI.per;const sold=S.items.filter(i=>i.st==='sold'&&inPer(i.soldDate||i.date,per));
   let sales=0,prof=0,cnt=0,days=[];const byS={},byG={},byP={},byM={},byC={};
@@ -1205,7 +1242,7 @@ function statsHTML(){
     const d1=pd(it.date),d2=pd(it.soldDate);if(d1&&d2)days.push((d2-d1)/864e5);
     for(const [m,k] of [[byS,it.store||'（店舗未入力）'],[byG,it.genre||'（ジャンル未入力）'],[byP,it.pub||'（出版社未入力）'],[byM,(it.date||'').slice(0,7)||'（日付なし）'],[byC,catOf(it)]]){m[k]=m[k]||{n:0,s:0,p:0};m[k].n++;m[k].s+=sp;m[k].p+=p}}
   const stock=S.items.filter(i=>(i.st==='stock'||i.st==='listed')&&!i.inSet);const stockCost=stock.reduce((s,i)=>s+(num(i.cost)||0),0);
-  const un=S.items.filter(i=>i.st==='listed'&&daysAgo(i.listDate||i.date)>num(S.settings.unsoldDays)).sort((a,b)=>daysAgo(b.listDate||b.date)-daysAgo(a.listDate||a.date));
+  const un=S.items.filter(cutDue).sort((a,b)=>daysAgo(b.listDate||b.date)-daysAgo(a.listDate||a.date));
   const re=recheckList();
   const tbl=(m)=>{const ks=Object.keys(m).sort((a,b)=>m[b].p-m[a].p);return ks.length?`<table class="fixt"><tr><th></th><th>件数</th><th>利益</th><th>利益率</th></tr>${ks.map(k=>`<tr><td class="wrap">${esc(k)}</td><td class="num">${m[k].n}</td><td class="num">${yenT(m[k].p)}</td><td class="num">${pct(m[k].p/m[k].s)}</td></tr>`).join('')}</table>`:'<div class="note">データなし</div>'};
   return `${pnlHTML()}<div class="sec">販売集計</div><div class="fchips">${[['month','今月'],['last','先月'],['30','直近30日'],['year','今年'],['all','全期間']].map(([k,l])=>`<button class="${per===k?'on':''}" data-act="per" data-v="${k}">${l}</button>`).join('')}</div>
@@ -1219,8 +1256,8 @@ function statsHTML(){
   ${UI.statsAxis==='genre'?`<div class="sec">ジャンル別</div><div class="card">${tbl(byG)}</div>`:''}
   ${UI.statsAxis==='pub'?`<div class="sec">出版社別</div><div class="card">${tbl(byP)}</div>`:''}
   ${UI.statsAxis==='month'?`<div class="sec">月別</div><div class="card">${tbl(byM)}</div>`:''}
-  <div class="sec">売れ残り・値下げ候補（出品から${esc(S.settings.unsoldDays)}日超）${un.length}件</div>
-  <div class="list">${un.slice(0,50).map(it=>`<div class="it" data-act="openItem" data-id="${esc(it.id)}">${thumb(it)}<div class="m"><div class="t">${esc(it.name)}</div><div class="s">出品${daysAgo(it.listDate||it.date)}日・出品価格 ${yenT(num(it.listPrice))}</div></div></div>`).join('')||'<div class="note">ありません</div>'}</div>
+  <div class="sec">売れ残り・値下げ候補（出品から${esc(S.settings.unsoldDays)}日超／改定から${CUT_DAYS}日超）${un.length}件</div>
+  <div class="list">${un.slice(0,50).map(it=>`<div class="it" data-act="openItem" data-id="${esc(it.id)}">${thumb(it)}<div class="m"><div class="t">${esc(it.name)}</div><div class="s">出品${daysAgo(it.listDate||it.date)}日・出品価格 ${yenT(num(it.listPrice))}${pd(it.cutDate)?`・最終改定 ${daysAgo(it.cutDate)}日前`:''}</div></div><div class="r"><button class="btn sm" data-act="cutOpen" data-id="${esc(it.id)}">値下げ</button></div></div>`).join('')||'<div class="note">ありません</div>'}</div>
   <div class="sec">再調査リスト（相場の鮮度低下）${re.length}件</div>
   <div class="list">${re.slice(0,50).map(({it,a})=>`<div class="it" data-act="openItem" data-id="${esc(it.id)}">${thumb(it)}<div class="m"><div class="t">${esc(it.name)}</div><div class="s">最新売り切れ ${a.st.latest?ymd(a.st.latest):'日付不明'}</div></div></div>`).join('')||'<div class="note">ありません</div>'}</div>`;
 }
@@ -1237,15 +1274,23 @@ function pnl(ym){
   const ex=S.expenses.filter(e=>String(e.date||'').slice(0,7)===ym);const exT=ex.reduce((a,e)=>a+(num(e.amount)||0),0);const exBy={};
   for(const e of ex){const k=e.cat||'その他';exBy[k]=(exBy[k]||0)+(num(e.amount)||0)}
   return{ym,n,sales,cost,c,exT,exBy,ex,byCat,net:sales-cost-exT}}
+// v1.7.8：月の純利益の目標（settings.goalYen、0/空/未設定＝オフ）
+function goalYen(){const g=num(S.settings.goalYen);return isFinite(g)&&g>0?Math.round(g):0}
+function goalCard(cur){const G=goalYen();if(!G)return '';const N=cur.net;
+  const rate=N>0?Math.floor(N/G*100):0,w=Math.min(100,rate);
+  return `<div class="card goal"><div class="row"><span class="grow">今月の純利益 <b class="num${N<0?' neg':''}">${yenT(N)}</b> ／ 目標 <b class="num">${yenT(G)}</b></span><b class="num">${rate}%</b></div>
+  <div class="gbar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${w}"><i style="width:${w}%"></i></div></div>`}
 function pnlChart(ym){
   const ms=[];for(let i=11;i>=0;i--)ms.push(pnl(ymAdd(ym,-i)));
-  const W=360,H=170,top=10,bot=22,l=4;const mx=Math.max(1,...ms.map(m=>Math.max(m.sales,m.net))),mn=Math.min(0,...ms.map(m=>m.net));
+  const G=goalYen();   // v1.7.8：目標ラインが必ず収まるよう最大値に含める
+  const W=360,H=170,top=10,bot=22,l=4;const mx=Math.max(1,G,...ms.map(m=>Math.max(m.sales,m.net))),mn=Math.min(0,...ms.map(m=>m.net));
   const sc=v=>top+(mx-v)/(mx-mn)*(H-top-bot);const z=sc(0);const cw=(W-l)/12;const bw=cw*0.34;
   let g=`<line x1="0" x2="${W}" y1="${z}" y2="${z}" stroke="var(--line)"/>`;
   ms.forEach((m,i)=>{const x=l+i*cw+cw*0.12;const ys=sc(m.sales),yn=sc(m.net);
     g+=`<rect x="${x}" y="${Math.min(ys,z)}" width="${bw}" height="${Math.max(Math.abs(z-ys),m.sales?1:0)}" fill="var(--s)" rx="2"><title>${m.ym} 売上 ${yenT(m.sales)}</title></rect>`;
     g+=`<rect x="${x+bw+1}" y="${Math.min(yn,z)}" width="${bw}" height="${Math.max(Math.abs(z-yn),m.net?1:0)}" fill="${m.net<0?'var(--x)':'var(--ss)'}" rx="2"><title>${m.ym} 純利益 ${yenT(m.net)}</title></rect>`;
     g+=`<text x="${l+i*cw+cw/2}" y="${H-6}" text-anchor="middle" font-size="10" fill="${m.ym===ym?'var(--tx)':'var(--mut)'}" font-weight="${m.ym===ym?700:400}">${+m.ym.slice(5)}月</text>`});
+  if(G>0){const gy=sc(G);g+=`<line class="goalLine" x1="0" x2="${W}" y1="${gy}" y2="${gy}" stroke="var(--w)" stroke-width="1.2" stroke-dasharray="5 4"><title>目標 ${yenT(G)}</title></line><text x="${W-2}" y="${gy<top+12?gy+11:gy-3}" text-anchor="end" font-size="9" fill="var(--w)">目標</text>`}
   return `<div class="chart"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="直近12ヶ月の売上と純利益">${g}</svg>
   <div class="lg"><span><i style="background:var(--s)"></i>売上</span><span><i style="background:var(--ss)"></i>純利益</span><span>最大 ${yenT(mx)}</span></div></div>`}
 function pnlHTML(){
@@ -1253,7 +1298,7 @@ function pnlHTML(){
   const neg=v=>v<0?' class="neg"':'';
   const cats=Object.keys(r.byCat).sort((a,b)=>{const ia=CATS.indexOf(a),ib=CATS.indexOf(b);return (ia<0?99:ia)-(ib<0?99:ib)});
   const exs=r.ex.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date)));
-  return `<div class="sec">収支</div>
+  return `<div class="sec">収支</div>${goalCard(ym===curYM()?r:pnl(curYM()))}
   <div class="pnav"><button class="btn sm" data-act="pnlM" data-v="-1">‹ 前月</button><b>${y}年${+m}月</b>${ym!==curYM()?'<button class="btn sm" data-act="pnlM" data-v="0">当月</button>':''}<button class="btn sm" data-act="pnlM" data-v="1">翌月 ›</button></div>
   <div class="card"><table class="pl">
   <tr><td>売上（売却済 ${r.n}件）</td><td class="num">${yenT(r.sales)}</td></tr>
@@ -1464,6 +1509,7 @@ function setHTML(){
   <div class="fld"><label>鮮度低下とみなす日数</label>${inp('fresh',s.fresh,'inputmode="numeric"')}</div>
   <div class="fld"><label>売却済みの重複警告（直近N日）</label>${inp('dupDays',s.dupDays,'inputmode="numeric"')}</div>
   <div class="fld"><label>売れ残りとみなす出品日数</label>${inp('unsoldDays',s.unsoldDays,'inputmode="numeric"')}</div>
+  <div class="fld"><label>月の純利益の目標（円）</label>${inp('goalYen',s.goalYen??'','inputmode="numeric" placeholder="0または空＝表示しない"')}</div>
   <div class="fld"><label>採用する販路</label><select data-set="pick"><option value="best"${s.pick==='best'?' selected':''}>最も上限が高い販路</option><option value="main"${s.pick==='main'?' selected':''}>主販路に固定</option></select></div>
   <div class="fld"><label>主販路</label><select data-set="main">${CH.map(c=>`<option value="${c}"${s.main===c?' selected':''}>${esc(s.ch[c].name)}</option>`).join('')}</select></div></div>
   <div class="fld"><label>今日の仕入店舗（購入登録時に記録）</label><select data-set="store"><option value="">（未設定）</option>${(s.stores||[]).map(x=>`<option${x===s.store?' selected':''}>${esc(x)}</option>`).join('')}${s.store&&!(s.stores||[]).includes(s.store)?`<option selected>${esc(s.store)}</option>`:''}</select></div>
@@ -1731,6 +1777,7 @@ const ACT={
   regPendSkip(){if(REG)REG.pend=null;regPendShow()},
   huntOpen(b){const e=S.hunt[+b.dataset.i];if(e)huntDetail(e)},
   huntOpenKey(b){const e=S.hunt.find(x=>x.title===b.dataset.t);if(e)huntDetail(e)},
+  huntBuy(b){huntBuy(b.dataset.t,!!b.dataset.cap)},
   key(b){if(!CUR){toast('先に本を調べてください');return}const k=b.dataset.k;let v=String(CUR.price??'');
     if(k==='C')v='';else if(k==='B')v=v.slice(0,-1);else if(v.length<7)v=(v==='0'?'':v)+k;CUR.price=v;updatePV();renderResult()},
   padToggle(){UI.padOpen=!UI.padOpen;renderPad()},
@@ -1802,6 +1849,8 @@ const ACT={
   pnlM(b){const d=+b.dataset.v;UI.pnlM=d===0?curYM():ymAdd(UI.pnlM||curYM(),d);render()},
   exOpen(b){exSheet(b.dataset.id||null)},
   exSave(b){exSave(b.dataset.id||null)},
+  cutOpen(b,e){if(e){e.preventDefault();e.stopPropagation()}cutSheet(b.dataset.id)},
+  cutSave(b){cutSave(b.dataset.id)},
   exDel(b){const e=S.expenses.find(x=>x.id===b.dataset.id);if(!e||!confirm(`この経費（${e.cat}・${yenT(num(e.amount))}）を削除しますか？`))return;S.expenses=S.expenses.filter(x=>x!==e);save();closeSheet();render();toast('経費を削除しました')},
   pnlCsv(){pnlCsv()},
   postaItem(){const base=String(S.settings.postaUrl||'').trim();if(!base){toast('設定でPOSTAのURLを入力してください');return}
@@ -1870,7 +1919,8 @@ document.addEventListener('change',e=>{
   if(EDIT&&el.dataset&&el.dataset.f!==undefined&&el.value==='__custom'){const k=el.dataset.f;const prev=EDIT[k];readEditor();EDIT[k]=prev;EDIT['_cust_'+k]=1;drawEditorKeep();return}
   if(el.dataset.set){const path=el.dataset.set.split('.');let o=S.settings;for(let i=0;i<path.length-1;i++)o=o[path[i]];
     const k=path[path.length-1];let v=el.type==='checkbox'?el.checked:el.value;
-    if(el.type!=='checkbox'&&el.inputMode&&/numeric|decimal/.test(el.inputMode)&&k!=='budget'){const n=num(v);v=isFinite(n)?n:o[k]}
+    if(k==='goalYen'&&String(v).trim()==='')v='';   // v1.7.8：目標は空にすると表示オフ
+    else if(el.type!=='checkbox'&&el.inputMode&&/numeric|decimal/.test(el.inputMode)&&k!=='budget'){const n=num(v);v=isFinite(n)?n:o[k]}
     o[k]=v;save();if(UI.tab!=='look')render();else renderResult();return}
   if(el.id==='postaF'&&el.files&&el.files[0]){const f=el.files[0];el.value='';f.text().then(t=>{try{postaImportAsk(t)}catch(err){toast(err.message||'読み込めませんでした')}});return}
   if(EDIT&&el.dataset.g&&el.type==='radio'){readEditor();const g=EDIT.gen;const k=el.dataset.g;if(k==='tokutenOn'){if(el.value==='0'){g.tokuten='';g._tok=0}else g._tok=1}else{g[k]=el.value;if(k==='kind'){if(isSetKind(g)&&!g.vols){const mv=memberVolsCsv(EDIT);if(mv)g.vols=mv;else if(num(g.from)){const f=num(g.from),t=num(g.to)||f;g.vols=volsCsv(`${f}-${Math.max(f,t)}`)}}syncWork(g)}}drawEditorKeep();return}
