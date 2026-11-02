@@ -261,9 +261,10 @@ input[type="date"]{min-width:0;max-width:100%}
    データ: localStorage "sedoscope_s_v1"（SedoScope本体 "sedoscope_v1" とは別）
    外部通信: openBD ISBN照会のみ
    ============================================================ */
-const APP_VER='1.7.8';
+const APP_VER='1.7.9';
 const APP_DATE='2026-10-24';
 const CHANGELOG=[
+  'v1.7.9（2026-11-02）設定タブに「出品下書きの更新を取り込む」ボタンを追加。サーバーに置いた出品下書き（draft_update.json）を取り込み、商品の出品メモ（タイトル・本文・出品価格・状態・メモ）に入れる。同じ下書きは同じ商品を更新し、重複して作らない。',
   'v1.7.8（2026-11-01）集計の「売れ残り・値下げ候補」に値下げボタンを追加（新しい出品価格と改定日を記録し、改定から7日を超えると再び候補に）。探し物リストの詳細から「セット上限で仕入れた」「この金額で仕入れた」で在庫に登録し、そのまま編集できるように。設定に月の純利益の目標を追加し、集計に達成率のカードと12ヶ月グラフの目標ラインを表示。',
   'v1.7.7（2026-11-01）設定タブに「探し物リストの更新を取り込む」ボタンを追加。サーバーに置いた更新ファイルをボタン1つで取り込めるように。',
   'v1.7.6（2026-10-29）調べる（探し物リスト）に出版社の絞り込みボタンと、出版社見出しの折りたたみ（開閉状態は保存）を追加。ジャンルの無い探し物は「漫画」としてまとめ、ジャンルの絞り込みにも「漫画」を追加。',
@@ -318,7 +319,7 @@ function defSettings(){return{
       r:{name:'ラクマ',fee:10,ship:210,on:true},a:{name:'ヤフオク',fee:10,ship:210,on:true}},
   pack:30,other:0,main:'m',pick:'main',
   acc:{obi:10,cover:30,booklet:10,poster:5,other:0},
-  store:'',stores:[],budget:'',autoQueue:false,postaUrl:'https://furumusx.github.io/posta/',komaUrl:'https://furumusx.github.io/KOMA/',huntCat:'',huntPub:'',huntGenre:'',huntUpdVer:0,
+  store:'',stores:[],budget:'',autoQueue:false,postaUrl:'https://furumusx.github.io/posta/',komaUrl:'https://furumusx.github.io/KOMA/',huntCat:'',huntPub:'',huntGenre:'',huntUpdVer:0,draftUpdVer:0,
 }}
 function defState(){return{schema:1,items:[],hunt:[],expenses:[],queue:[],biblio:{},settings:defSettings(),links:DEF_LINKS.map(x=>({...x})),
   meta:{created:new Date().toISOString(),lastBackup:null,imports:[]}}}
@@ -332,6 +333,7 @@ function fixState(s){
   const ds=defSettings(), ss=(s.settings&&typeof s.settings==='object')?s.settings:{};
   const ch={}; for(const c of CH) ch[c]=Object.assign({},ds.ch[c],(ss.ch||{})[c]||{});
   s.settings=Object.assign(ds,ss,{ch,acc:Object.assign({},ds.acc,ss.acc||{})});
+  if(typeof s.settings.draftUpdVer!=='number'||!isFinite(s.settings.draftUpdVer))s.settings.draftUpdVer=0;   // v1.7.9：旧データには無い
   s.links=Array.isArray(s.links)?s.links:d.links;
   s.hunt=Array.isArray(s.hunt)?s.hunt:[];
   if(s.templates!==undefined&&!Array.isArray(s.templates))delete s.templates;   // v1.7.3：定型文はPOSTAへ一本化。古いデータの templates は残すが使わない
@@ -512,6 +514,21 @@ function huntNorm(o){if(!o||typeof o!=='object')return null;const n=v=>{const x=
 function huntImport(txt){const o=JSON.parse(txt);const arr=Array.isArray(o)?o:(o&&(o.hunt||o.items||o.list||o.data));if(!Array.isArray(arr))throw new Error('探し物リストの形式ではありません');
   let add=0,upd=0,bad=0;for(const r of arr){const e=huntNorm(r);if(!e){bad++;continue}const i=S.hunt.findIndex(x=>x.title===e.title);if(i>=0){S.hunt[i]=e;upd++}else{S.hunt.push(e);add++}}
   save();return{add,upd,bad,total:S.hunt.length}}
+// ---- 出品下書きの取り込み（v1.7.9）：draft_update.json の drafts を商品の出品メモ欄へ ----
+const DRAFT_TXT=['listTitle','listDesc','cond','memo'];
+function draftNorm(o){if(!o||typeof o!=='object'||Array.isArray(o))return null;
+  const draftKey=String(o.draftKey??'').trim(),name=String(o.name??'').trim();if(!draftKey||!name)return null;
+  const f={};for(const k of DRAFT_TXT)if(o[k]!==undefined&&o[k]!==null)f[k]=String(o[k]);
+  if(o.listPrice!==undefined&&o.listPrice!==null&&o.listPrice!==''){const p=num(o.listPrice);if(!(isFinite(p)&&p>0))return null;f.listPrice=Math.round(p)}
+  const sssId=o.sssId!==undefined&&o.sssId!==null?String(o.sssId).trim():'';
+  return{draftKey,name,sssId,f}}
+function draftImport(txt){const o=JSON.parse(txt);const arr=o&&typeof o==='object'&&!Array.isArray(o)?o.drafts:null;if(!Array.isArray(arr))throw new Error('出品下書きの形式ではありません');
+  let add=0,upd=0,bad=0;const now=new Date().toISOString();
+  for(const r of arr){const d=draftNorm(r);if(!d){bad++;continue}
+    let it=(d.sssId&&getItem(d.sssId))||S.items.find(x=>x&&x.draftKey===d.draftKey)||null;
+    if(it){Object.assign(it,d.f);if(!it.draftKey)it.draftKey=d.draftKey;it.updated=now;upd++}
+    else{it=newItem(Object.assign({name:d.name,st:'stock',date:today()},d.f,{draftKey:d.draftKey}));S.items.unshift(it);add++}}
+  save();return{add,upd,bad}}
 
 /* ---------- 判定 ---------- */
 function analyze(ctx){
@@ -1534,7 +1551,7 @@ function setHTML(){
   前回のバックアップ：<b>${S.meta.lastBackup?esc(String(S.meta.lastBackup).slice(0,16).replace('T',' ')):'なし'}</b><br>
   保存キー：<span class="num">${KEY}</span>（SedoScope本体のデータとは別）
   <div class="btns mt3"><button class="btn pri" data-act="doBackup">バックアップを書き出す</button><button class="btn" data-act="copyBackup">バックアップをコピー</button><button class="btn" data-act="restoreOpen">バックアップから復元</button></div>
-  <div class="btns mt2"><button class="btn" data-act="sedoOpen">SedoScopeのデータを取り込む</button><button class="btn" data-act="csvOpen">相場CSVを取り込む</button><label class="btn pick">探し物リストを取り込む<input type="file" id="huntF" accept=".json,application/json,text/plain"></label><button class="btn" data-act="huntUpdate">探し物リストの更新を取り込む</button></div>
+  <div class="btns mt2"><button class="btn" data-act="sedoOpen">SedoScopeのデータを取り込む</button><button class="btn" data-act="csvOpen">相場CSVを取り込む</button><label class="btn pick">探し物リストを取り込む<input type="file" id="huntF" accept=".json,application/json,text/plain"></label><button class="btn" data-act="huntUpdate">探し物リストの更新を取り込む</button><button class="btn" data-act="draftUpdate">出品下書きの更新を取り込む</button></div>
   <div class="btns mt2"><button class="btn dng" data-act="wipe">すべてのデータを初期化</button></div></div>
   <div class="note my3">SSS v${APP_VER}（${APP_DATE}）／外部通信は openBD（ISBNの書誌照会）のみ。</div>`;
 }
@@ -1883,6 +1900,13 @@ const ACT={
     if(v<=(S.settings.huntUpdVer||0)){toast('探し物リストは最新です');return}
     let r;try{r=huntImport(txt)}catch(err){toast(err.message||'読み込めません');return}
     S.settings.huntUpdVer=v;save();toast(`探し物リスト：追加${r.add}件・更新${r.upd}件（全${r.total}件）${r.bad?`・読めない行${r.bad}件`:''}`);render()},
+  async draftUpdate(){let txt,o;   // v1.7.9：同一オリジンの draft_update.json を取り込む（huntUpdate と同型）
+    try{const r=await fetch('draft_update.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);txt=await r.text()}catch(e){toast('出品下書きの更新を取得できませんでした');return}
+    try{o=JSON.parse(txt)}catch(e){o=null}
+    const v=o&&o.version;if(typeof v!=='number'||!isFinite(v)||!Array.isArray(o.drafts)){toast('出品下書きファイルの形式が違います');return}
+    if(v<=(S.settings.draftUpdVer||0)){toast('出品下書きは最新です');return}
+    let r;try{r=draftImport(txt)}catch(err){toast(err.message||'読み込めません');return}
+    S.settings.draftUpdVer=v;save();toast(`出品下書き：新規${r.add}件・更新${r.upd}件${r.bad?`・読めない行${r.bad}件`:''}`);render()},
   async csvRun(){const txt=await readFT('cv');if(!txt.trim()){toast('CSVを選ぶか貼り付けてください');return}
     let r;try{r=importCSV(txt,$('#cvTgt').value,$('#cvN').value,$('#cvS').value)}catch(e){toast(e.message);return}
     $('#cvSum').innerHTML=`<div class="card sum">取り込み先：<b class="ff">${esc(r.it.name)}</b>${r.created?'（新規作成）':''}<br>読み込んだ行 <b>${r.total}</b>／追加 <b>${r.add}</b>／重複除外 <b>${r.dup}</b>／読めない行 <b>${r.bad}</b></div>`;
