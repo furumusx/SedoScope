@@ -43,8 +43,8 @@ header .store{margin-left:auto;font-size:11.5px;color:var(--mut);max-width:45%;o
 .banner{margin:0;padding:10px 12px;border-radius:12px;background:var(--wbg);border:1px solid #f0d7a8;color:#6b4306;font-size:13px;display:flex;gap:8px;align-items:center;box-shadow:0 6px 18px rgba(20,20,20,.12)}
 .banner.red{background:var(--xbg);border-color:#f3c2c2;color:#7a1414}
 .banner button{margin-left:auto;background:#141414;border:0;border-radius:9px;padding:7px 11px;color:#fff;white-space:nowrap;font-weight:700;font-size:12.5px}
-main{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:var(--sp3) 16px calc(var(--tabh) + var(--safe) + 70px)}
-nav#tabs{position:fixed;left:0;right:0;bottom:0;z-index:30;display:flex;background:#fff;border-top:1px solid var(--line);padding:6px 10px var(--safe);height:calc(var(--tabh) + var(--safe))}
+main{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:var(--sp3) 16px 70px}
+nav#tabs{flex:none;display:flex;background:#fff;border-top:1px solid var(--line);padding:6px 10px var(--safe);height:calc(var(--tabh) + var(--safe))}
 nav#tabs button{flex:1;background:none;border:0;color:var(--mut2);font-size:10.5px;font-weight:600;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;position:relative}
 nav#tabs button svg{width:23px;height:23px}
 nav#tabs button.on{color:var(--tx)}
@@ -242,9 +242,10 @@ label.pick{position:relative;overflow:hidden}label.pick input{position:absolute;
    外部通信: openBD ISBN照会のみ（ほかに同一オリジンの hunt_update.json）
    ============================================================ */
 
-const APP_VER='2.0.0';
+const APP_VER='2.0.1';
 const APP_DATE='2026-11-03';
 const CHANGELOG=[
+  'v2.0.1（2026-11-03）実機フィードバックの修正。下部タブバーを画面下端に付けた（浮いて下に余白ができていた）。補完中リストの所持判定を厳密にし、別作品（キングダムハーツ→キングダム、BORUTO→NARUTO など）を数えないようにした。「巻ノ19」形式の巻数と「全2巻」形式の全巻数を読めるようにした。同じ作品の重複行は1行にまとめ、全巻セットを売却済みの作品は補完中に出さない。探し物の詳細に「この探し物を削除」を追加（商品の記録は消えない）。保存キー・データ形式は変更なし。',
   'v2.0.0（2026-11-03）台帳化リニューアル。SSS を「記録・相場・集計」の台帳に専念させ、出品作業は新・出品作業アプリへ移した。タブを 在庫／探し物／集計／設定 にし、ヘッダーを「SSS（台帳）」に。出品メモ・下書き（draft_update）・定型文・単品の試算・値下げ作業・POSTA/KOMA 連携ボタンを画面から外した（データは消さず、商品詳細の「旧メモ」と設定の「旧定型文」で読み取り専用で見られる）。在庫画面の先頭に「読み取りで登録（バーコード／ISBN）」。商品詳細に履歴タイムライン（記録元：手入力／取り込み／移行）とステータスの手早い切り替え。集計の先頭に今月の純利益・回転・在庫数と段階目標との差。新アプリとの連携（候補の書き出し：SSSのアイテムIDがキー／結果の取り込み：二重防止・差分プレビュー・競合の保留・必須項目の検証）。保存は localStorage のまま1つの関数に集約し、容量メーター（70%で警告）・バックアップ経過日数（7日超で強調）・navigator.storage.persist() を追加。初回起動時は移行前の全データを別キーに自動で控え、書き出しを促す。データにスキーマ版数 2 を付けた。',
   'v1.7.9（2026-11-02）設定タブに「出品下書きの更新を取り込む」ボタンを追加。',
   'v1.7.8（2026-11-01）値下げボタン、探し物から仕入れ登録、月の純利益の目標。',
@@ -493,7 +494,7 @@ function parseVols(s){const set=new Set();String(s||'').normalize('NFKC').split(
   const m=p.match(/^(\d+)(?:[-~〜](\d+))?$/);if(!m)return;const a=+m[1],b=m[2]?+m[2]:a;if(Math.abs(b-a)>500)return;
   for(let i=Math.min(a,b);i<=Math.max(a,b);i++)set.add(i)});return set}
 function volOf(name){const t=String(name||'').normalize('NFKC');
-  const m=t.match(/第?\s*(\d+)\s*巻/)||t.match(/vol\.?\s*(\d+)/i)||t.match(/\s(\d{1,3})\s*$/)||t.match(/[\s―—](\d{1,3})(?=[\s―—]|$)/);return m?+m[1]:null}
+  const m=t.match(/巻[ノの]\s*(\d{1,3})/)||t.match(/第?\s*(\d+)\s*巻/)||t.match(/vol\.?\s*(\d+)/i)||t.match(/\s(\d{1,3})\s*$/)||t.match(/[\s―—](\d{1,3})(?=[\s―—]|$)/);return m?+m[1]:null}
 function volCheck(it,pool){
   if(!it||!it.range)return null;const need=parseVols(it.range);if(!need.size)return null;
   let have,src;
@@ -524,9 +525,14 @@ function accFactor(it){let f=1;const miss=[];
 const hkey=e=>workKey(e.work||e.title);
 function keyMatch(a,b){if(!a||!b)return false;if(a===b)return true;const s1=a.length<=b.length?a:b,l=a.length<=b.length?b:a;return s1.length>=3&&l.includes(s1)}
 function itemVols(it){if(it.have){const s=parseVols(it.have);if(s.size)return s}const r=itemRangeOf(it);const out=new Set();if(r)for(let v=r[0];v<=r[1];v++)out.add(v);return out}
-function huntInv(e){if(!isBook(e))return [];const k=hkey(e);return S.items.filter(it=>(it.st==='stock'||it.st==='listed')&&isBook(it)&&!it.mixed&&keyMatch(k,itemKey(it)))}   // 取引中・売却済は所持に数えない
+function huntMatch(hk,ik){if(!hk||!ik)return false;if(hk===ik)return true;   // v2.0.1：補完判定専用の厳密照合（部分一致で別作品を数えない）
+  const strip=s=>s.replace(/^[\s=\-―—・:：+＋/／|｜]+/,'');
+  if(ik.startsWith(hk)){const r=strip(ik.slice(hk.length));if(!r)return true;if(/^巻[ノの]?$/.test(r))return true;return /^[a-z0-9]/.test(r)}   // 英数字で始まる残りだけ同じ作品（かな・漢字・その他の文字は別作品）
+  if(hk.startsWith(ik)){const r=strip(hk.slice(ik.length));return /^巻[ノの]?$/.test(r)}
+  return false}
+function huntInv(e){if(!isBook(e))return [];const k=hkey(e);return S.items.filter(it=>(it.st==='stock'||it.st==='listed')&&isBook(it)&&!it.mixed&&huntMatch(k,itemKey(it)))}   // 取引中・売却済は所持に数えない
 function ownedVols(e){const set=new Set();for(const it of huntInv(e))for(const v of itemVols(it))set.add(v);return set}
-function huntHit(key){if(!key||!S.hunt||!S.hunt.length)return null;return S.hunt.find(e=>keyMatch(hkey(e),key))||null}
+function huntHit(key){if(!key||!S.hunt||!S.hunt.length)return null;return S.hunt.find(e=>huntMatch(hkey(e),key))||null}
 function isSetCtx(it,title){if(it){if(it.mixed||/セット/.test(String(it.setk||'')+String(it.name||'')))return true;const r=itemRangeOf(it);return !!(r&&r[1]>r[0])}
   const t=String(title||'');if(/セット|全巻/.test(t))return true;const r=volRangeOfName(t);return !!(r&&r[1]>r[0])}
 function huntNorm(o){if(!isObj(o))return null;const n=v=>{const x=num(v);return isFinite(x)&&x>0?x:null};
@@ -854,7 +860,8 @@ function huntPage(){const L=S.hunt||[];
   ${hasGenre?`<div class="fchips hgens">${[['','すべて',L.length],...allGenres.map(g=>[g,g,L.filter(e=>genreOf(e)===g).length]),...(nNone?[[NONE,MANGA,nNone]]:[])].map(([k,l,n])=>`<button class="${hg===k?'on':''}" data-act="huntGenre" data-v="${esc(k)}">${esc(l)} ${n}</button>`).join('')}</div>`:''}
   <div class="hinfo">📋 <span id="hCnt">${hit.length}${q?` / ${inCat}`:''}</span>件<details class="hx"><summary>所持巻について</summary><div class="note">所持巻は、本・コミックの在庫（仕入済・出品中）から自動で計算しています。取引中・売却済は数えません。</div></details></div>
   <div id="huntRes">${body||'<div class="empty">該当する作品はありません。</div>'}</div>`}
-function huntDetail(e){const inv=huntInv(e);const o=[...ownedVols(e)].sort((x,y)=>x-y);
+let HUNT_CUR=null;   // v2.0.1：いま開いている探し物詳細の行（削除はこの行そのもの＝同じオブジェクトを消す。タイトルの重複に左右されない）
+function huntDetail(e){HUNT_CUR=e;const inv=huntInv(e);const o=[...ownedVols(e)].sort((x,y)=>x-y);
   openSheet(e.title,`<div class="card"><table>
   <tr><td>カテゴリ</td><td>${esc(catOf(e))}</td></tr><tr><td>ジャンル</td><td class="wrap">${esc(genreOf(e)||'漫画')}</td></tr><tr><td>作品名（照合用）</td><td class="wrap">${esc(e.work||'—')}</td></tr><tr><td>出版社</td><td>${esc(e.publisher||'—')}</td></tr><tr><td>巻</td><td>${esc(e.vols||'—')}</td></tr>
   <tr><td>中央値</td><td class="num">${e.median?yenT(e.median):'—'}</td></tr><tr><td>単巻上限</td><td class="num">${e.perVolCap?yenT(e.perVolCap):'—'}</td></tr><tr><td>セット上限</td><td class="num">${e.setCap?yenT(e.setCap):'—'}</td></tr>
@@ -864,7 +871,15 @@ function huntDetail(e){const inv=huntInv(e);const o=[...ownedVols(e)].sort((x,y)
   <div class="sec">仕入れ登録</div><div class="card">
   ${e.setCap?`<button class="btn pri" style="width:100%" data-act="huntBuy" data-t="${esc(e.title)}" data-cap="1">セット上限（¥${Math.round(e.setCap).toLocaleString('ja-JP')}）で仕入れた</button>`:''}
   <div class="row${e.setCap?' mt2':''}"><input id="hbAmt" class="grow inline-in" style="width:auto" inputmode="numeric" placeholder="仕入れた金額（円）"><button class="btn sm" data-act="huntBuy" data-t="${esc(e.title)}">この金額で仕入れた</button></div>
-  <div id="hbErr" class="note" style="color:var(--x)"></div></div>`)}
+  <div id="hbErr" class="note" style="color:var(--x)"></div></div>
+  <div class="btns mt3"><button class="btn dng" data-act="huntDel" data-i="${S.hunt.indexOf(e)}">この探し物を削除</button></div>`)}
+// v2.0.1：探し物の行を1つ削除（商品の記録には触らない）。表示中の行（HUNT_CUR）と data-i の行が同じオブジェクトであることを確かめてから消す。保存に失敗したら元の位置に戻す
+function huntDel(i){const e=HUNT_CUR;
+  if(!e||!(i>=0)||S.hunt[i]!==e){toast('探し物が見つかりません（画面を開き直してください）');closeSheet();render();return}
+  if(!confirm(`探し物「${e.title}」${e.vols!=null&&e.vols!==''?`（巻：${e.vols}）`:''}を削除しますか？\n商品の記録は消えません。`))return;
+  S.hunt.splice(i,1);
+  if(!save()){S.hunt.splice(i,0,e);render();return}   // 保存できなかった：メモリ上も元に戻し、詳細は開いたまま
+  closeSheet();render();toast('探し物を削除しました')}
 // v1.7.8：探し物詳細から仕入れ登録（在庫として追加→その商品の編集を開く）。対象は title で引く（huntOpenKey と同じ方式）
 function huntBuy(title,useSet){const e=S.hunt.find(x=>x.title===title);if(!e){toast('探し物が見つかりません');return}
   const amt=useSet?num(e.setCap):num(($('#hbAmt')||{}).value);
@@ -912,7 +927,7 @@ function renderBanner(){
 function partial(html,ids){const t=document.createElement('div');t.innerHTML=html;for(const id of ids){const cur=document.getElementById(id),nw=t.querySelector('#'+id);if(cur&&nw)cur.innerHTML=nw.innerHTML}}
 function openSheet(title,html){$('#shT').textContent=title;$('#shB').innerHTML=html;$('#sheet').hidden=false;$('#shB').scrollTop=0}
 function keepScroll(fn){const y=$('#shB').scrollTop;fn();$('#shB').scrollTop=y}
-function closeSheet(){if(Scan.on&&Scan.wrapSel==='#regCam')stopScan();$('#sheet').hidden=true;EDIT=null;REG=null;DETAIL=null;RES_PLAN=null}
+function closeSheet(){if(Scan.on&&Scan.wrapSel==='#regCam')stopScan();$('#sheet').hidden=true;EDIT=null;REG=null;DETAIL=null;RES_PLAN=null;HUNT_CUR=null}
 
 /* ---------- 履歴 ---------- */
 function addHist(it,ev){if(!Array.isArray(it.hist))it.hist=deriveHist(it);
@@ -1133,13 +1148,16 @@ function saveEditor(){
 
 /* ---------- 探し物 ---------- */
 function huntRot(e){const t=num(e&&(e.turnover??e.rot));if(t>0)return t;const m=String((e&&e.memo)||'').normalize('NFKC').match(/(\d+(?:\.\d+)?)\s*回\s*\/\s*月/);return m?+m[1]:null}
-function huntTotal(e){const t=String(e.vols??'').normalize('NFKC').trim();let m=t.match(/(\d+)\s*[〜~\-]\s*(\d+)/);if(m)return +m[2];m=t.match(/^(\d+)\s*巻?$/);return m?+m[1]:null}
+function huntTotal(e){const t=String(e.vols??'').normalize('NFKC').trim();let m=t.match(/(\d+)\s*[〜~\-]\s*(\d+)/);if(m)return +m[2];m=t.match(/全\s*(\d+)\s*巻/);if(m)return +m[1];m=t.match(/^(\d+)\s*巻?$/);return m?+m[1]:null}
 function fillRows(){const out=[];(S.hunt||[]).forEach((e,i)=>{if(!isBook(e))return;const N=huntTotal(e);if(!(N>=2))return;
+    const hk=hkey(e);if(S.items.some(it=>it.st==='sold'&&isBook(it)&&huntMatch(hk,itemKey(it))&&(()=>{const r=itemRangeOf(it);return r&&r[0]<=1&&r[1]>=N})()))return;   // v2.0.1：全巻セットを完売済みの作品は補完中に出さない
     const own=[...ownedVols(e)].filter(v=>v>=1&&v<=N);if(!own.length)return;const os=new Set(own);const miss=[];for(let v=1;v<=N;v++)if(!os.has(v))miss.push(v);if(!miss.length)return;
     const got=huntInv(e).reduce((s,it)=>s+(num(it.cost)||0),0);let rem=null,per=null;
     if(e.setCap>0){rem=e.setCap-got;per=Math.floor(rem/miss.length)}else if(e.perVolCap>0){per=e.perVolCap;rem=per*miss.length}
     out.push({e,i,N,miss,got,rem,per})});
-  return out.sort((a,b)=>a.miss.length-b.miss.length)}
+  const seen=new Map();for(const r of out){const dk=hkey(r.e)+'|'+r.N;const prev=seen.get(dk);   // v2.0.1：同じ作品の重複行（全巻セット版／通常版）は1行にまとめる
+    if(!prev||((r.e.setCap>0||r.e.perVolCap>0)&&!(prev.e.setCap>0||prev.e.perVolCap>0)))seen.set(dk,r)}
+  return [...seen.values()].sort((a,b)=>a.miss.length-b.miss.length)}
 function huntTabHTML(){const L=S.hunt||[];const last=L.map(e=>String(e.checked||'')).filter(Boolean).sort().pop()||'';
   const F=fillRows();
   return `<div class="h-row"><h2 class="pg">探し物</h2><span class="chip blue">${L.length}件${last?`・${esc(mdShort(last))}更新`:''}</span></div>
@@ -1448,6 +1466,7 @@ const ACT={
   regPendSkip(){if(REG)REG.pend=null;regPendShow()},
   regForm(){const st=S.settings.store||'';if(Scan.on)stopScan();REG=null;openEditor(null,{st:'stock',date:today(),store:st})},
   huntOpen(b){const e=S.hunt[+b.dataset.i];if(e)huntDetail(e)},
+  huntDel(b){huntDel(+b.dataset.i)},
   huntBuy(b){huntBuy(b.dataset.t,!!b.dataset.cap)},
   openItem(b,e){e&&e.preventDefault();openItem(b.dataset.id)},
   editItem(){if(DETAIL)openEditor(DETAIL)},
